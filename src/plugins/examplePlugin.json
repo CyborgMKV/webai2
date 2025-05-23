@@ -1,0 +1,22 @@
+{
+    "name": "SuperHeartPlugin",
+    "version": "1.0.0",
+    "description": "Adds a super heart entity with bonus points.",
+    "entities": [
+        {
+            "type": "heart",
+            "color": "#00ffff",
+            "baseSize": 0.5,
+            "health": 20,
+            "scoreValue": 500
+        }
+    ],
+    "effects": [
+        {
+            "type": "particle",
+            "name": "superHeartExplosion",
+            "color": "#00ffff",
+            "intensity": 2
+        }
+    ]
+}

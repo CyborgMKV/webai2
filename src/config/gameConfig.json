@@ -1,0 +1,20 @@
+{
+    "player": {
+        "maxHealth": 100,
+        "startPosition": { "x": 0, "y": 0, "z": 0 }
+    },
+    "flyingRobot": {
+        "spawnRate": 2,
+        "speedRange": [1, 4],
+        "silverChance": 0.04,
+        "goldChance": 0.01,
+        "baseScore": 100
+    },
+    "heart": {
+        "baseHealth": 10,
+        "baseScore": 200
+    },
+    "level": {
+        "maxRobots": 10
+    }
+}

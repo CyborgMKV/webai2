@@ -1,0 +1,32 @@
+/**
+ * SuperHeartPlugin - Example JS plugin module.
+ * Adds a super heart entity and a custom particle effect.
+ */
+export default {
+    name: 'SuperHeartPlugin',
+    version: '1.0.0',
+    description: 'Adds a super heart entity with bonus points.',
+    /**
+     * Called when the plugin is loaded.
+     * @param {Game} game
+     */
+    init(game) {
+        // Register a new entity type (super heart)
+        game.spawnHeart({
+            color: '#00ffff',
+            baseSize: 0.5,
+            health: 20,
+            scoreValue: 500
+        });
+
+        // Register a custom effect (pseudo-code, expand as needed)
+        if (game.effects) {
+            game.effects.register({
+                type: 'particle',
+                name: 'superHeartExplosion',
+                color: '#00ffff',
+                intensity: 2
+            });
+        }
+    }
+};

@@ -1,0 +1,24 @@
+{
+    "name": "YourPluginName",
+    "version": "1.0.0",
+    "description": "Describe what your plugin adds or changes.",
+    "entities": [
+        {
+            "type": "entityType",         // e.g., "heart", "flyingRobot", "player"
+            "color": "#ffffff",           // Optional: color for entity
+            "baseSize": 1.0,              // Optional: base size
+            "health": 10,                 // Optional: health value
+            "scoreValue": 100             // Optional: score value
+            // Add more custom fields as needed
+        }
+    ],
+    "effects": [
+        {
+            "type": "effectType",         // e.g., "particle", "sound"
+            "name": "effectName",         // Unique effect name
+            "color": "#ff0000",           // Optional: effect color
+            "intensity": 1                // Optional: effect intensity
+            // Add more custom fields as needed
+        }
+    ]
+}
