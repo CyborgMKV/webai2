@@ -6,7 +6,7 @@ import Entity from '../engine/entity.js';
  */
 export default class Player extends Entity {
     /**
-     * @param {Object} options - { position, model, health, ... }
+     * @param {Object} options - { position, model, health, maxHealth, game, ... }
      */
     constructor(options = {}) {
         super();
@@ -15,11 +15,32 @@ export default class Player extends Entity {
         this.position = options.position || { x: 0, y: 0, z: 0 };
         this.velocity = options.velocity || { x: 0, y: 0, z: 0 };
         this.model = options.model || null; // THREE.Group or Mesh
-        this.health = options.health || 100;
-        this.maxHealth = options.maxHealth || 100;
+        
+        let initialMaxHealth = 100; // Default maxHealth
+
+        // Prioritize game config for maxHealth if game instance and config are passed in options
+        if (options.game && 
+            options.game.config && 
+            options.game.config.player && 
+            typeof options.game.config.player.maxHealth === 'number') {
+            initialMaxHealth = options.game.config.player.maxHealth;
+            console.log(`Player: Using maxHealth from game.config: ${initialMaxHealth}`);
+        } else if (typeof options.maxHealth === 'number') {
+            initialMaxHealth = options.maxHealth;
+            console.log(`Player: Using maxHealth from options: ${initialMaxHealth}`);
+        } else {
+            console.log(`Player: Using default maxHealth: ${initialMaxHealth}`);
+        }
+        
+        this.maxHealth = initialMaxHealth;
+        // Initialize health to maxHealth, unless options.health is specifically provided
+        this.health = (typeof options.health === 'number') ? options.health : this.maxHealth;
+
         this.score = 0;
         this.input = options.input || null; // Input handler/component
         this.initComponents(options.components || []);
+
+        console.log(`Player initialized with health: ${this.health}/${this.maxHealth}`);
     }
 
     /**
@@ -57,7 +78,12 @@ export default class Player extends Entity {
     takeDamage(amount) {
         this.health -= amount;
         if (this.health < 0) this.health = 0;
+        console.log(`Player health: ${this.health}/${this.maxHealth}`);
         // TODO: Handle player death, respawn, etc.
+        if (this.health === 0) {
+            console.log("Player has died.");
+            // Potentially set this.state = 'dead'; or call a game over method on the game instance
+        }
     }
 
     /**

@@ -1,0 +1,27 @@
+{
+    "name": "SharkPlugin",
+    "version": "1.0.0",
+    "description": "Plugin to add a shark entity to the game.",
+    "entities": [
+        {
+            "type": "shark",
+            "name": "MyShark",
+            "modelPath": "assets/models/shark.glb",
+            "position": {
+                "x": 0,
+                "y": -2,
+                "z": -15
+            },
+            "rotation": {
+                "x": 0,
+                "y": 1.5707963267948966,
+                "z": 0
+            },
+            "scale": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            }
+        }
+    ]
+}

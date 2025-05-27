@@ -17,7 +17,7 @@ export default class App {
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-        this.game = new Game();
+        this.game = new Game(this);
         this.game.start();
         this.player = null;
 
@@ -29,9 +29,9 @@ this.earth.addComponent('minimapBlip', new MinimapBlipComponent());
         this.setupEvents();
         this.setupScene(); // <-- Added this line
         this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-dirLight.position.set(10, 10, 10);
-this.scene.add(dirLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(10, 10, 10);
+        this.scene.add(dirLight);
         
         this.game.addEntity(this.earth); // Register Earth as an entity
         this.scene.add(this.earth.mesh);
@@ -45,16 +45,16 @@ this.scene.add(dirLight);
         this.scene.add(starfield);
         
         const robot = new FlyingRobot({x: 10, y: 5, z: -20});
-this.game.addEntity(robot);
-//if (robot.mesh) {
-//    this.scene.add(robot.mesh);
-//}
+        this.game.addEntity(robot);
+        //if (robot.mesh) {
+        //    this.scene.add(robot.mesh);
+        //}
 
 
-// Add mesh to scene after it's loaded
-robot.onModelLoaded = (mesh) => {
-    this.scene.add(robot.mesh);
-};
+        // Add mesh to scene after it's loaded
+        robot.onModelLoaded = (mesh) => {
+            this.scene.add(robot.mesh);
+        };
 
 
 
@@ -84,7 +84,6 @@ robot.onModelLoaded = (mesh) => {
     this.player.addComponent('hud', new HUDComponent());
     this.player.addComponent('minimap', new MinimapComponent());
     this.game.setPlayer(this.player);
-    this.game.addEntity(this.player);
     if (this.player.mesh) {
         this.scene.add(this.player.mesh);
     }
@@ -121,4 +120,4 @@ robot.onModelLoaded = (mesh) => {
     }
 }
 
-window.app = new App();
+// Removed: window.app = new App();
