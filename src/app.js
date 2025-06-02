@@ -1,3 +1,4 @@
+// This is a test comment added by Jules.
 import * as THREE from '../libs/three/three.module.js';
 // If you use GLTFLoader or DRACOLoader here, add:
 import { GLTFLoader } from '../libs/three/loaders/GLTFLoader.js';
