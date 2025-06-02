@@ -16,5 +16,25 @@
     },
     "level": {
         "maxRobots": 10
+    },
+    "weapons": {
+        "uzi": {
+            "model": "assets/models/uzi.glb",
+            "scale": 0.08,
+            "damage": 15,
+            "fireRate": 0.15,
+            "attackType": "raycast" 
+        },
+        "plasmaRifle": {
+            "model": "assets/models/plasma_rifle.glb",
+            "scale": 0.05,
+            "damage": 40,
+            "fireRate": 0.5,
+            "attackType": "projectile",
+            "projectileSpeed": 20,
+            "projectileColor": "0x00ff00", 
+            "projectileSize": 0.2,
+            "projectileLifespan": 2 
+        }
     }
 }
