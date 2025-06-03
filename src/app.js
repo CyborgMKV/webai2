@@ -69,8 +69,10 @@ export default class App {
             // Health can also be driven by game.config.player.maxHealth if desired
             health: (this.game.config.player && this.game.config.player.maxHealth) || 100,
             maxHealth: (this.game.config.player && this.game.config.player.maxHealth) || 100,
-            game: this.game // Pass the game instance
+            game: this.game, // Pass the game instance
+            model: new THREE.Group() // <--- ADD THIS LINE
         });
+        console.log('Player instance model immediately after new Player():', this.player.model);
 
         // Add essential components
         this.player.addComponent('hud', new HUDComponent()); 
@@ -92,6 +94,9 @@ export default class App {
         // For now, if player.model is a THREE object post-construction, add it.
         if (this.player.model) {
             this.scene.add(this.player.model);
+            console.log("App.setupPlayer: Player model ADDED to scene.", this.player.model);
+        } else {
+            console.log("App.setupPlayer: Player model is NULL or undefined, NOT added to scene.");
         }
          console.log("App: Player setup complete.");
     }

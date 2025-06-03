@@ -107,6 +107,7 @@ export default class Player extends Entity {
 
         this.weaponModelCheckInterval = setInterval(() => {
             if (this.currentWeapon && this.currentWeapon.model) {
+                console.log('Player model check in equipWeapon interval. this.model:', this.model);
                 if (this.model) {
                     let pos = { x: 0, y: 0, z: 0.5 }; 
                     let rot = { x: 0, y: Math.PI, z: 0 }; 
