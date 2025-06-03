@@ -3,8 +3,10 @@ import { GLTFLoader } from '../../libs/three/loaders/GLTFLoader.js';
 // Removed: import gameConfig from '../config/gameConfig.json';
 import Projectile from './projectile.js';
 
+// ---- THESE LINES ARE CRUCIAL ----
 let gameConfig = null;
 let globalConfigPromise = null;
+// ------------------------------------
 
 class Weapon {
     static async loadGlobalConfig(configPath = '../config/gameConfig.json') {
@@ -24,7 +26,7 @@ class Weapon {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status} for ${configPath}`);
                 }
-                gameConfig = await response.json();
+                gameConfig = await response.json(); // Assigns to module-scoped gameConfig
                 // console.log('Weapon Global Config successfully loaded:', gameConfig);
                 return gameConfig;
             } catch (error) {
@@ -41,15 +43,15 @@ class Weapon {
         this.weaponName = weaponName;
         this.shooter = shooter;
 
+        // This now correctly refers to the module-scoped gameConfig
         if (!gameConfig) {
             console.error("Weapon Error: Global gameConfig not loaded. Ensure Weapon.loadGlobalConfig() was called and awaited before instantiating Weapons.");
-            // Provide a default/fallback config to prevent further errors, or consider throwing an error.
             this.config = { model: "", scale: 0.1, attackType: 'none', fireRate: 1, damage: 0, projectileSpeed: 0, projectileLifespan: 0, projectileColor: "0xffffff", projectileSize: 0.1 };
         } else if (!gameConfig.weapons || !gameConfig.weapons[weaponName]) {
             console.warn(`Weapon: Config for "${weaponName}" not found in loaded gameConfig. Using fallback.`);
             this.config = { model: "", scale: 0.1, attackType: 'none', fireRate: 1, damage: 0, projectileSpeed: 0, projectileLifespan: 0, projectileColor: "0xffffff", projectileSize: 0.1 };
         } else {
-            this.config = { ...gameConfig.weapons[weaponName] }; // Use spread to copy, avoid modifying global
+            this.config = { ...gameConfig.weapons[weaponName] }; // Use spread to copy
         }
         
         this.model = null;
@@ -69,7 +71,6 @@ class Weapon {
         const loader = new GLTFLoader();
         loader.load(this.config.model, (gltf) => {
             this.model = gltf.scene;
-            // Player.equipWeapon handles scaling based on its own logic/config.
             console.log(`Weapon: Model for ${this.weaponName} loaded.`);
         }, undefined, (error) => {
             console.error(`Error loading weapon model ${this.weaponName} from ${this.config.model}:`, error);
@@ -93,7 +94,7 @@ class Weapon {
         } else {
             console.warn(`Weapon: Unknown attack type "${this.config.attackType}" for ${this.weaponName}.`);
         }
-        return firedSuccessfully; // Return status
+        return firedSuccessfully;
     }
 
     performRaycast(origin, direction) {
@@ -166,5 +167,4 @@ class Weapon {
 
     update(deltaTime) { /* Not much here for now */ }
 }
-
 export default Weapon;
