@@ -17,6 +17,10 @@ export default class Entity {
         if (instance.init) instance.init(this);
     }
 
+    getComponent(name) {
+        return this.components[name];
+    }
+
     update(deltaTime, game) {
         for (const name in this.components) {
             const comp = this.components[name];
