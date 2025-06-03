@@ -30,12 +30,13 @@ export default class App {
         this.setupCamera();
         // setupPlayer must be called after game config is loaded if player depends on it.
         // Game constructor is async due to config loading. We need to ensure config is ready.
-        this.game.loadConfig('src/config/gameConfig.json').then(() => {
+        this.game.loadConfig('src/config/gameConfig.json').then(async () => { // Make the callback async
             console.log("App: Game config loaded, proceeding with player setup.");
-            this.setupPlayer(); // Now safe to setup player
+            await this.setupPlayer(); // Await the async setupPlayer
             this.game.start(); // Start game loop after essential setup
         }).catch(error => {
             console.error("App: Failed to load game config. Player setup and game start might be affected.", error);
+            // Consider if you need to start the game or parts of it even if player setup fails
         });
         
         this.setupEvents();
@@ -57,7 +58,7 @@ export default class App {
         this.camera.lookAt(0, 0, 0);
     }
 
-    setupPlayer() {
+    async setupPlayer() { // Changed to async
         if (!this.game.config) {
             console.error("App.setupPlayer: Game config not loaded. Cannot setup player.");
             return;
@@ -75,6 +76,14 @@ export default class App {
         this.player.addComponent('hud', new HUDComponent()); 
         this.player.addComponent('minimap', new MinimapComponent());
         this.player.addComponent('input', new InputComponent()); // Add InputComponent
+
+        // Now, setup the initial weapon (which loads its model and config)
+        try {
+            await this.player.setupInitialWeapon(); // Call and await here
+        } catch (error) {
+            console.error("App.setupPlayer: Error during player.setupInitialWeapon():", error);
+            // Decide how to handle this - e.g., player might not have a weapon
+        }
 
         this.game.setPlayer(this.player); // Register player with the game
 
