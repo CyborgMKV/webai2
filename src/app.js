@@ -18,8 +18,12 @@ export default class App {
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.outputColorSpace = THREE.SRGBColorSpace; // Correct color space
         
+        this.dracoLoader = new DRACOLoader();
+        this.dracoLoader.setDecoderPath('../libs/three/draco/gltf/'); // Adjusted path
+        this.gltfLoader = new GLTFLoader();
+        this.gltfLoader.setDRACOLoader(this.dracoLoader);
+        
         this.game = new Game(this); // Pass app instance to Game
-<<<<<<< HEAD
         // Game related initializations (like loading config, gameMaster) happen within Game's constructor
         
         this.player = null; // Player will be set up in setupPlayer
@@ -31,35 +35,13 @@ export default class App {
         this.setupCamera();
         // setupPlayer must be called after game config is loaded if player depends on it.
         // Game constructor is async due to config loading. We need to ensure config is ready.
-        this.game.loadConfig('src/config/gameConfig.json').then(() => {
+        this.game.loadConfig('src/config/gameConfig.json').then(async () => { // Add async here
             console.log("App: Game config loaded, proceeding with player setup.");
-            this.setupPlayer(); // Now safe to setup player
-            this.game.start(); // Start game loop after essential setup
+            await this.setupPlayer(); // Add await here
+            console.log("App: Player setup process in App constructor finished. Starting game."); // New log
+            this.game.start(); 
         }).catch(error => {
-            console.error("App: Failed to load game config. Player setup and game start might be affected.", error);
-=======
-        
-        this.player = null; 
-
-        this.earth = new Earth();
-        this.earth.addComponent('minimapBlip', new MinimapBlipComponent()); 
-
-        this.setupRenderer();
-        this.setupCamera();
-        
-        // Game constructor loads its own config. App should await player setup.
-        this.game.loadConfig('src/config/gameConfig.json').then(async () => { // Make the callback async
-            console.log("App: Game config loaded by Game instance, app proceeding with player setup.");
-            // It's implied game.config is now populated from game's own loadConfig.
-            await this.setupPlayer(); // Await the async setupPlayer
-            console.log("App: Player setup awaited in App constructor. Starting game.");
-            this.game.start(); // Start game loop after essential setup
-        }).catch(error => {
-            console.error("App: Error during game config loading or player setup chain:", error);
-            // Potentially still start game but with player issues, or halt.
-            // For now, let's try starting the game anyway to see other systems.
-            // this.game.start(); 
->>>>>>> eae5216 (chore: Sync latest updates from cPanel)
+            console.error("App: Failed to load game config or complete player setup. Player setup and game start might be affected.", error); // Modified log
         });
         
         this.setupEvents();
@@ -70,6 +52,19 @@ export default class App {
         this.animate();
     }
 
+    async loadModel(path) {
+        console.log(`App.loadModel: Attempting to load model from ${path}`);
+        return new Promise((resolve, reject) => {
+            this.gltfLoader.load(path, (gltf) => {
+                console.log(`App.loadModel: Successfully loaded model from ${path}`);
+                resolve(gltf.scene);
+            }, undefined, (error) => {
+                console.error(`App.loadModel: Error loading model from ${path}:`, error);
+                reject(error);
+            });
+        });
+    }
+
     setupRenderer() {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -77,29 +72,47 @@ export default class App {
     }
 
     setupCamera() {
-<<<<<<< HEAD
         this.camera.position.set(0, 2, 10); // Adjusted camera position
         this.camera.lookAt(0, 0, 0);
     }
 
-    setupPlayer() {
+    async setupPlayer() {
         if (!this.game.config) {
             console.error("App.setupPlayer: Game config not loaded. Cannot setup player.");
             return;
         }
+
+        let playerModel;
+        try {
+            // Use 'assets/models/mt-103__rig_v1.3.4.glb' as the player model path
+            playerModel = await this.loadModel('assets/models/mt-103__rig_v1.3.4.glb'); 
+            console.log("App.setupPlayer: Player model loaded successfully.");
+        } catch (error) {
+            console.error("App.setupPlayer: Failed to load player model. Proceeding without player model.", error);
+            // playerModel will remain undefined, Player constructor handles null model
+        }
+
         // Player setup now uses the game instance which has the config
         this.player = new Player({
             position: { x: 0, y: 0, z: 0 },
-            // Health can also be driven by game.config.player.maxHealth if desired
             health: (this.game.config.player && this.game.config.player.maxHealth) || 100,
             maxHealth: (this.game.config.player && this.game.config.player.maxHealth) || 100,
-            game: this.game // Pass the game instance
+            game: this.game,
+            model: playerModel // Pass the loaded model here
         });
 
         // Add essential components
         this.player.addComponent('hud', new HUDComponent()); 
         this.player.addComponent('minimap', new MinimapComponent());
         this.player.addComponent('input', new InputComponent()); // Add InputComponent
+
+        try {
+            console.log("App.setupPlayer: Calling player.setupInitialWeapon()...");
+            await this.player.setupInitialWeapon();
+            console.log("App.setupPlayer: player.setupInitialWeapon() completed.");
+        } catch (error) {
+            console.error("App.setupPlayer: Error during player.setupInitialWeapon():", error);
+        }
 
         this.game.setPlayer(this.player); // Register player with the game
 
@@ -110,49 +123,6 @@ export default class App {
             this.scene.add(this.player.model);
         }
          console.log("App: Player setup complete.");
-=======
-        this.camera.position.set(0, 2, 10); 
-        this.camera.lookAt(0, 0, 0);
-    }
-
-    async setupPlayer() { // Make the method async
-        if (!this.game.config) {
-            console.error("App.setupPlayer: Game config not loaded in game instance. Cannot setup player.");
-            return;
-        }
-        
-        console.log("App.setupPlayer: Instantiating Player...");
-        this.player = new Player({
-            position: { x: 0, y: 0, z: 0 },
-            health: (this.game.config.player && this.game.config.player.maxHealth) || 100,
-            maxHealth: (this.game.config.player && this.game.config.player.maxHealth) || 100,
-            game: this.game, 
-            model: new THREE.Group() // Provide placeholder model
-        });
-        console.log('Player instance model immediately after new Player():', this.player.model);
-
-        this.player.addComponent('hud', new HUDComponent()); 
-        this.player.addComponent('minimap', new MinimapComponent());
-        this.player.addComponent('input', new InputComponent()); 
-
-        console.log("App.setupPlayer: Calling player.setupInitialWeapon()...");
-        try {
-            await this.player.setupInitialWeapon(); // Call and await here
-            console.log("App.setupPlayer: player.setupInitialWeapon() completed.");
-        } catch (error) {
-            console.error("App.setupPlayer: Error during player.setupInitialWeapon():", error);
-        }
-
-        this.game.setPlayer(this.player); 
-
-        if (this.player.model) {
-            this.scene.add(this.player.model);
-            console.log("App.setupPlayer: Player model ADDED to scene.", this.player.model);
-        } else {
-            console.log("App.setupPlayer: Player model is NULL or undefined, NOT added to scene.");
-        }
-        console.log("App.setupPlayer: Player setup method complete."); // Changed log message
->>>>>>> eae5216 (chore: Sync latest updates from cPanel)
     }
 
     setupEvents() {
@@ -160,7 +130,6 @@ export default class App {
     }
 
     setupScene() {
-<<<<<<< HEAD
         // Basic lighting
         this.scene.add(new THREE.AmbientLight(0xffffff, 0.6)); // Soft ambient light
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); // Brighter directional light
@@ -175,36 +144,23 @@ export default class App {
 
         // Starfield background
         const starGeo = new THREE.SphereGeometry(100, 32, 32); // Increased radius for better coverage
-=======
-        this.scene.add(new THREE.AmbientLight(0xffffff, 0.6)); 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); 
-        dirLight.position.set(5, 10, 7); 
-        this.scene.add(dirLight);
-
-        if (this.earth.mesh) {
-            this.scene.add(this.earth.mesh);
-        }
-        this.game.addEntity(this.earth); 
-
-        const starGeo = new THREE.SphereGeometry(100, 32, 32); 
->>>>>>> eae5216 (chore: Sync latest updates from cPanel)
+        // The line above is from HEAD, the starfield texture code below is from the previous turn's modification
+        const starTexture = new THREE.TextureLoader().load('assets/textures/starfield.jpg');
+        starTexture.minFilter = THREE.LinearFilter; 
+        starTexture.magFilter = THREE.LinearFilter;
+        starTexture.anisotropy = Math.max(1, this.renderer.capabilities.getMaxAnisotropy()); 
+        
         const starMat = new THREE.MeshBasicMaterial({
-            map: new THREE.TextureLoader().load('assets/textures/starfield3.jpg'),
+            map: starTexture,
             side: THREE.BackSide
         });
         const starfield = new THREE.Mesh(starGeo, starMat);
         this.scene.add(starfield);
         
-<<<<<<< HEAD
         // Example FlyingRobot (ensure it's added to scene via its onModelLoaded or similar)
         const robot = new FlyingRobot({x: 10, y: 5, z: -20});
         this.game.addEntity(robot); // Game manages entities
         robot.onModelLoaded = (mesh) => { // Ensure robot adds its mesh to the scene
-=======
-        const robot = new FlyingRobot({x: 10, y: 5, z: -20}); // Example
-        this.game.addEntity(robot); 
-        robot.onModelLoaded = (mesh) => { 
->>>>>>> eae5216 (chore: Sync latest updates from cPanel)
             if(mesh) this.scene.add(mesh);
         };
     }
@@ -221,7 +177,6 @@ export default class App {
         const deltaTime = (now - this.lastTime) / 1000;
         this.lastTime = now;
         
-<<<<<<< HEAD
         // Game loop updates all entities, including player and its components
         if (this.game && this.game.running) {
             this.game.loop(); // This should handle entity.update(deltaTime, game)
@@ -229,10 +184,6 @@ export default class App {
             // If game isn't running yet (e.g. config loading), manually update critical parts if needed
             // For example, if earth had an animation before game start:
             // if (this.earth) this.earth.update(deltaTime, this.game);
-=======
-        if (this.game && this.game.running) {
-            this.game.loop(); 
->>>>>>> eae5216 (chore: Sync latest updates from cPanel)
         }
         
         this.renderer.render(this.scene, this.camera);
