@@ -7,7 +7,7 @@ let gameConfig = null;
 let globalConfigPromise = null;
 
 class Weapon {
-    static async loadGlobalConfig(configPath = '../config/gameConfig.json') {
+    static async loadGlobalConfig(configPath = './src/config/gameConfig.json') {
         if (gameConfig) {
             // console.log('Weapon Global Config already loaded.');
             return gameConfig;
