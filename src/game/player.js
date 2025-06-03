@@ -35,13 +35,14 @@ export default class Player extends Entity {
         this.ammo = 0;
         this.maxAmmo = 0;
 
-        if (this.game && this.game.scene && this.game.config) {
-            this.equipWeapon(this.availableWeaponConfigs[this.currentWeaponIndex]);
-        } else {
-            console.warn('Player: Game instance, scene, or config not provided. Cannot initialize weapons.');
-        }
+        // Initial weapon setup is now handled by setupInitialWeapon, called by game/app
+        // if (this.game && this.game.scene && this.game.config) {
+        //     this.equipWeapon(this.availableWeaponConfigs[this.currentWeaponIndex]);
+        // } else {
+        //     console.warn('Player: Game instance, scene, or config not provided. Cannot initialize weapons.');
+        // }
 
-        console.log(`Player initialized. Health: ${this.health}/${this.maxHealth}.`);
+        console.log(`Player initialized. Health: ${this.health}/${this.maxHealth}. Call setupInitialWeapon() to equip default weapon.`);
     }
 
     initComponents(components) {
@@ -50,12 +51,32 @@ export default class Player extends Entity {
         }
     }
 
-    equipWeapon(weaponName) {
-        if (!this.game || !this.game.config || !this.game.config.weapons || !this.game.config.weapons[weaponName]) {
-            console.error(`Player.equipWeapon: Config for "${weaponName}" not found.`);
-            return;
+    async setupInitialWeapon() {
+        if (this.game && this.game.scene && this.availableWeaponConfigs.length > 0) {
+            // The check for this.game.config is removed here because equipWeapon
+            // will rely on Weapon.loadGlobalConfig() which handles its own config loading.
+            try {
+                // console.log('Player: Setting up initial weapon...');
+                await this.equipWeapon(this.availableWeaponConfigs[this.currentWeaponIndex]);
+                // console.log('Player: Initial weapon setup complete.');
+            } catch (error) {
+                console.error("Player: Failed to equip initial weapon during setup:", error);
+                this.currentWeapon = null; // Fallback: player has no weapon
+            }
+        } else {
+            console.warn('Player: Game instance/scene not fully available, or no available weapons. Cannot initialize default weapon.');
+            this.currentWeapon = null;
         }
-        
+    }
+
+    async equipWeapon(weaponName) {
+        await Weapon.loadGlobalConfig(); // Ensure global config is loaded
+
+        // Original check for game.config.weapons can now use the (now loaded) global gameConfig from Weapon class
+        // However, Weapon constructor itself handles this, so direct check here is redundant if Weapon handles it robustly.
+        // For safety, we can keep a check or rely on Weapon's error handling.
+        // Let's assume Weapon's constructor will now correctly use the loaded config or fallback.
+
         console.log(`Player: Equipping weapon "${weaponName}"`);
 
         if (this.weaponModelCheckInterval) {
@@ -124,11 +145,11 @@ export default class Player extends Entity {
         }
     }
     
-    switchToWeaponByIndex(index) {
+    async switchToWeaponByIndex(index) {
         if (index >= 0 && index < this.availableWeaponConfigs.length) {
             const weaponNameToEquip = this.availableWeaponConfigs[index];
             if (!this.currentWeapon || this.currentWeapon.weaponName !== weaponNameToEquip) {
-                 this.equipWeapon(weaponNameToEquip);
+                 await this.equipWeapon(weaponNameToEquip);
             }
         }
     }

@@ -1,19 +1,55 @@
 import * as THREE from '../../libs/three/three.module.js';
 import { GLTFLoader } from '../../libs/three/loaders/GLTFLoader.js';
-import gameConfig from '../config/gameConfig.json';
+// Removed: import gameConfig from '../config/gameConfig.json';
 import Projectile from './projectile.js';
 
+let gameConfig = null;
+let globalConfigPromise = null;
+
 class Weapon {
+    static async loadGlobalConfig(configPath = '../config/gameConfig.json') {
+        if (gameConfig) {
+            // console.log('Weapon Global Config already loaded.');
+            return gameConfig;
+        }
+        if (globalConfigPromise) {
+            // console.log('Weapon Global Config is already being loaded.');
+            return globalConfigPromise;
+        }
+
+        // console.log('Attempting to load Weapon Global Config from:', configPath);
+        globalConfigPromise = (async () => {
+            try {
+                const response = await fetch(configPath);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status} for ${configPath}`);
+                }
+                gameConfig = await response.json();
+                // console.log('Weapon Global Config successfully loaded:', gameConfig);
+                return gameConfig;
+            } catch (error) {
+                console.error(`Could not load weapon global configuration from ${configPath}:`, error);
+                globalConfigPromise = null; // Reset promise so retry might be possible
+                throw error; // Re-throw to allow callers to handle
+            }
+        })();
+        return globalConfigPromise;
+    }
+
     constructor(scene, weaponName, shooter) {
         this.scene = scene;
         this.weaponName = weaponName;
         this.shooter = shooter;
 
-        if (!gameConfig.weapons || !gameConfig.weapons[weaponName]) {
-            console.error(`Weapon: Config for "${weaponName}" not found! Using fallback.`);
-            this.config = { model: "", scale: 0.1, attackType: 'none', fireRate: 1, damage: 0 };
+        if (!gameConfig) {
+            console.error("Weapon Error: Global gameConfig not loaded. Ensure Weapon.loadGlobalConfig() was called and awaited before instantiating Weapons.");
+            // Provide a default/fallback config to prevent further errors, or consider throwing an error.
+            this.config = { model: "", scale: 0.1, attackType: 'none', fireRate: 1, damage: 0, projectileSpeed: 0, projectileLifespan: 0, projectileColor: "0xffffff", projectileSize: 0.1 };
+        } else if (!gameConfig.weapons || !gameConfig.weapons[weaponName]) {
+            console.warn(`Weapon: Config for "${weaponName}" not found in loaded gameConfig. Using fallback.`);
+            this.config = { model: "", scale: 0.1, attackType: 'none', fireRate: 1, damage: 0, projectileSpeed: 0, projectileLifespan: 0, projectileColor: "0xffffff", projectileSize: 0.1 };
         } else {
-            this.config = gameConfig.weapons[weaponName];
+            this.config = { ...gameConfig.weapons[weaponName] }; // Use spread to copy, avoid modifying global
         }
         
         this.model = null;
