@@ -171,13 +171,21 @@ export default class PhysicsManager {
             const position = rigidBody.translation();
             const rotation = rigidBody.rotation();
 
-            // Ensure entity has a proper Vector3 position
-            if (!entity.position || typeof entity.position.set !== 'function') {
-                console.warn('PhysicsManager: Entity missing proper Vector3 position, creating one:', entity);
-                entity.position = new THREE.Vector3();
+            // Ensure entity.position is a THREE.Vector3, converting if necessary
+            const currentEntityPosition = entity.position;
+            if (!currentEntityPosition || typeof currentEntityPosition.set !== 'function') {
+                const entityIdentifier = entity.name || entity.type || 'Unnamed Entity';
+                console.warn(`PhysicsManager: Entity '${entityIdentifier}' position is not a THREE.Vector3. Converting now.`);
+
+                // Preserve original x,y,z values if they exist on the plain object
+                const px = currentEntityPosition ? (currentEntityPosition.x || 0) : 0;
+                const py = currentEntityPosition ? (currentEntityPosition.y || 0) : 0;
+                const pz = currentEntityPosition ? (currentEntityPosition.z || 0) : 0;
+                entity.position = new THREE.Vector3(px, py, pz);
             }
 
-            // Update entity position (Vector3)
+            // Now, entity.position is guaranteed to be a THREE.Vector3.
+            // Update entity position from the physics simulation (using 'position' from rigidBody.translation())
             entity.position.set(position.x, position.y, position.z);
 
             // Update entity rotation if it has one
