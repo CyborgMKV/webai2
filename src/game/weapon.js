@@ -2,6 +2,7 @@ import * as THREE from '../../libs/three/three.module.js';
 import { GLTFLoader } from '../../libs/three/loaders/GLTFLoader.js';
 // Removed: import gameConfig from '../config/gameConfig.json';
 import Projectile from './projectile.js'; // Ensure this path is correct
+import { sanitizeGeometry } from '../utils/math.js';
 
 // ---- THESE LINES ARE CRUCIAL ----
 let gameConfig = null;
@@ -64,9 +65,7 @@ class Weapon {
             this.raycaster = new THREE.Raycaster();
         }
         this.loadModel();
-    }
-
-    loadModel() {
+    }    loadModel() {
         if (!this.config.model) {
             console.warn(`Weapon.loadModel: No model path for ${this.weaponName}. (v2)`);
             return;
@@ -74,6 +73,17 @@ class Weapon {
         const loader = new GLTFLoader();
         loader.load(this.config.model, (gltf) => {
             this.model = gltf.scene;
+            
+            // Sanitize geometry to prevent NaN values in BufferGeometry
+            this.model.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    const wasSanitized = sanitizeGeometry(child.geometry);
+                    if (wasSanitized) {
+                        console.log(`Weapon.loadModel: Sanitized geometry for weapon mesh in ${this.weaponName}`);
+                    }
+                }
+            });
+            
             console.log(`Weapon.loadModel: Model for ${this.weaponName} loaded. (v2)`);
         }, undefined, (error) => {
             console.error(`Weapon.loadModel: Error loading weapon model ${this.weaponName} from ${this.config.model} (v2):`, error);

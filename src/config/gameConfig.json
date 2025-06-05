@@ -16,31 +16,30 @@
     },
     "level": {
         "maxRobots": 10
-    },
-    "weapons": {
+    },    "weapons": {
         "uzi": {
             "model": "assets/models/uzi.glb",
             "scale": 0.08,
             "damage": 15,
-            "fireRate": 0.15,
+            "fireRate": 0.1,
             "maxAmmo": 150,
             "attackType": "projectile",
             "projectileSpeed": 20,
             "projectileColor": "0x00ff00", 
-            "projectileSize": 0.2,
-            "projectileLifespan": 2 
+            "projectileSize": 0.1,
+            "projectileLifespan": 5 
         },
         "plasmaRifle": {
             "model": "assets/models/plasma_rifle.glb",
             "scale": 0.05,
-            "damage": 40,
+            "damage": 50,
             "fireRate": 0.5,
             "attackType": "projectile",
             "maxAmmo": 150,
-            "projectileSpeed": 20,
+            "projectileSpeed": 30,
             "projectileColor": "0xffff00", 
             "projectileSize": 0.2,
-            "projectileLifespan": 2 
+            "projectileLifespan": 5 
         }
     }
 }

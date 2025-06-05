@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebAI 3D - Live Error Detection</title>
+    <style>
+        body { 
+            font-family: 'Courier New', monospace; 
+            margin: 0; 
+            padding: 20px; 
+            background: #0a0a0a; 
+            color: #00ff00; 
+        }
+        .header { 
+            text-align: center; 
+            margin-bottom: 30px; 
+            color: #ffffff; 
+        }
+        .status-panel { 
+            background: #1a1a1a; 
+            border: 2px solid #333; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin: 10px 0; 
+        }
+        .error-count { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #ff4444; 
+        }
+        .success-count { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #44ff44; 
+        }
+        .console-output { 
+            background: #000; 
+            color: #00ff00; 
+            padding: 15px; 
+            border-radius: 4px; 
+            white-space: pre-wrap; 
+            font-family: monospace; 
+            max-height: 300px; 
+            overflow-y: auto; 
+            margin: 15px 0; 
+            border: 1px solid #333;
+        }
+        .test-button { 
+            background: #2d5a2d; 
+            color: white; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin: 5px; 
+            font-family: inherit;
+        }
+        .test-button:hover { background: #3d6a3d; }
+        .iframe-wrapper { 
+            width: 100%; 
+            height: 400px; 
+            border: 2px solid #333; 
+            border-radius: 8px; 
+            margin: 20px 0; 
+            background: #111;
+        }
+        .iframe-wrapper iframe { 
+            width: 100%; 
+            height: 100%; 
+            border: none; 
+        }
+        .error { color: #ff4444; }
+        .warning { color: #ffaa44; }
+        .info { color: #4488ff; }
+        .success { color: #44ff44; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎮 WebAI 3D Game - LIVE NaN ERROR DETECTOR</h1>
+        <p>Real-time monitoring for THREE.js BufferGeometry NaN errors</p>
+    </div>
+    
+    <div class="status-panel">
+        <h3>📊 Error Statistics</h3>
+        <div>BufferGeometry NaN Errors: <span class="error-count" id="nan-errors">0</span></div>
+        <div>Successful Geometry Operations: <span class="success-count" id="success-ops">0</span></div>
+        <div>Total Console Messages: <span id="total-messages">0</span></div>
+    </div>
+    
+    <button class="test-button" onclick="startMonitoring()">🔍 Start Deep Monitoring</button>
+    <button class="test-button" onclick="testDirectly()">⚡ Test BufferGeometry Directly</button>
+    <button class="test-button" onclick="clearConsole()">🧹 Clear Console</button>
+    <button class="test-button" onclick="stressTest()">💥 Stress Test Geometry</button>
+    
+    <div class="console-output" id="console"></div>
+    
+    <h3>🎯 Live Game Instance</h3>
+    <div class="iframe-wrapper">
+        <iframe src="http://localhost:8000" id="gameFrame"></iframe>
+    </div>
+    
+    <script>
+        let nanErrorCount = 0;
+        let successCount = 0;
+        let totalMessages = 0;
+        let consoleDiv = document.getElementById('console');
+        let monitoring = false;
+        
+        // Store original console methods
+        const originalConsole = {
+            log: console.log.bind(console),
+            error: console.error.bind(console),
+            warn: console.warn.bind(console),
+            info: console.info.bind(console)
+        };
+        
+        function addToConsole(message, type = 'log') {
+            const timestamp = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${timestamp}] ${message}`;
+            consoleDiv.appendChild(div);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            
+            totalMessages++;
+            document.getElementById('total-messages').textContent = totalMessages;
+            
+            // Check for specific NaN errors
+            if (message.toLowerCase().includes('nan') && 
+                (message.toLowerCase().includes('buffergeometry') || 
+                 message.toLowerCase().includes('boundingsphere') ||
+                 message.toLowerCase().includes('computed radius'))) {
+                nanErrorCount++;
+                document.getElementById('nan-errors').textContent = nanErrorCount;
+                
+                // Highlight critical errors
+                div.style.backgroundColor = '#3d1a1a';
+                div.style.fontWeight = 'bold';
+                addToConsole('🚨 CRITICAL: BufferGeometry NaN error detected!', 'error');
+            }
+            
+            // Count successful operations
+            if (message.toLowerCase().includes('sanitized') || 
+                message.toLowerCase().includes('geometry') && 
+                message.toLowerCase().includes('success')) {
+                successCount++;
+                document.getElementById('success-ops').textContent = successCount;
+            }
+            
+            // Keep only last 50 messages
+            if (consoleDiv.children.length > 50) {
+                consoleDiv.removeChild(consoleDiv.firstChild);
+            }
+        }
+        
+        // Override console methods to catch all messages
+        console.log = function(...args) {
+            originalConsole.log.apply(console, args);
+            addToConsole(args.join(' '), 'log');
+        };
+        
+        console.error = function(...args) {
+            originalConsole.error.apply(console, args);
+            addToConsole('ERROR: ' + args.join(' '), 'error');
+        };
+        
+        console.warn = function(...args) {
+            originalConsole.warn.apply(console, args);
+            addToConsole('WARNING: ' + args.join(' '), 'warning');
+        };
+        
+        console.info = function(...args) {
+            originalConsole.info.apply(console, args);
+            addToConsole('INFO: ' + args.join(' '), 'info');
+        };
+        
+        function clearConsole() {
+            consoleDiv.innerHTML = '';
+            totalMessages = 0;
+            document.getElementById('total-messages').textContent = '0';
+            addToConsole('Console cleared - monitoring continues...', 'info');
+        }
+        
+        function startMonitoring() {
+            if (monitoring) {
+                addToConsole('Deep monitoring already active', 'warning');
+                return;
+            }
+            
+            monitoring = true;
+            addToConsole('🔍 Starting deep monitoring for BufferGeometry NaN errors...', 'info');
+            
+            // Monitor iframe if possible
+            const iframe = document.getElementById('gameFrame');
+            
+            // Try to access iframe console (may be blocked by CORS)
+            setInterval(() => {
+                try {
+                    if (iframe.contentWindow && iframe.contentWindow.console) {
+                        // Attempt to monitor iframe console
+                        addToConsole('Monitoring iframe console...', 'info');
+                    }
+                } catch (e) {
+                    // Expected CORS restriction
+                }
+            }, 10000);
+            
+            // Monitor for specific error patterns
+            window.addEventListener('error', (e) => {
+                if (e.message && e.message.toLowerCase().includes('nan')) {
+                    addToConsole(`🚨 WINDOW ERROR: ${e.message}`, 'error');
+                    addToConsole(`File: ${e.filename}, Line: ${e.lineno}`, 'error');
+                }
+            });
+            
+            // Monitor for unhandled promise rejections
+            window.addEventListener('unhandledrejection', (e) => {
+                if (e.reason && e.reason.toString().toLowerCase().includes('nan')) {
+                    addToConsole(`🚨 PROMISE REJECTION: ${e.reason}`, 'error');
+                }
+            });
+        }
+        
+        async function testDirectly() {
+            addToConsole('⚡ Testing BufferGeometry directly...', 'info');
+            
+            try {
+                // We need to wait for THREE.js to load in the iframe
+                const iframe = document.getElementById('gameFrame');
+                
+                // Try to inject test script into iframe
+                setTimeout(() => {
+                    try {
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        if (iframeDoc) {
+                            const script = iframeDoc.createElement('script');
+                            script.textContent = `
+                                console.log('🧪 Direct BufferGeometry test starting...');
+                                
+                                if (typeof THREE !== 'undefined') {
+                                    try {
+                                        // Test 1: Create geometry with NaN values
+                                        const testGeometry = new THREE.BufferGeometry();
+                                        const positions = new Float32Array([
+                                            0, 0, 0,
+                                            1, 1, 1,
+                                            NaN, NaN, NaN  // Intentional NaN
+                                        ]);
+                                        testGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                                        
+                                        // This should trigger the error if not properly handled
+                                        testGeometry.computeBoundingSphere();
+                                        
+                                        console.log('❌ TEST FAILED: NaN geometry did not throw error!');
+                                    } catch (error) {
+                                        if (error.message.includes('NaN')) {
+                                            console.log('✅ TEST PASSED: NaN geometry properly detected');
+                                        } else {
+                                            console.log('⚠️ TEST UNCLEAR: Different error thrown: ' + error.message);
+                                        }
+                                    }
+                                    
+                                    // Test 2: Check if sanitizeGeometry exists
+                                    if (typeof sanitizeGeometry === 'function') {
+                                        console.log('✅ sanitizeGeometry function is available');
+                                    } else {
+                                        console.log('❌ sanitizeGeometry function NOT found');
+                                    }
+                                } else {
+                                    console.log('⚠️ THREE.js not yet loaded in iframe');
+                                }
+                            `;
+                            iframeDoc.head.appendChild(script);
+                            addToConsole('✅ Test script injected into game iframe', 'success');
+                        } else {
+                            addToConsole('❌ Cannot access iframe document', 'error');
+                        }
+                    } catch (e) {
+                        addToConsole(`❌ Script injection failed: ${e.message}`, 'error');
+                    }
+                }, 2000);
+                
+            } catch (error) {
+                addToConsole(`❌ Direct test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        function stressTest() {
+            addToConsole('💥 Starting geometry stress test...', 'info');
+            
+            // This will test our fixes under load
+            setTimeout(() => {
+                const iframe = document.getElementById('gameFrame');
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    if (iframeDoc) {
+                        const script = iframeDoc.createElement('script');
+                        script.textContent = `
+                            console.log('💥 Stress testing geometry operations...');
+                            
+                            if (typeof THREE !== 'undefined') {
+                                let testCount = 0;
+                                let errorCount = 0;
+                                
+                                for (let i = 0; i < 10; i++) {
+                                    try {
+                                        const geometry = new THREE.BufferGeometry();
+                                        const positions = new Float32Array(300); // 100 vertices
+                                        
+                                        // Fill with mix of normal and problematic values
+                                        for (let j = 0; j < positions.length; j++) {
+                                            if (Math.random() < 0.1) {
+                                                positions[j] = NaN; // 10% chance of NaN
+                                            } else if (Math.random() < 0.05) {
+                                                positions[j] = Infinity; // 5% chance of Infinity
+                                            } else {
+                                                positions[j] = (Math.random() - 0.5) * 100;
+                                            }
+                                        }
+                                        
+                                        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                                        
+                                        // Apply sanitization if available
+                                        if (typeof sanitizeGeometry === 'function') {
+                                            const wasSanitized = sanitizeGeometry(geometry);
+                                            if (wasSanitized) {
+                                                console.log('✅ Geometry sanitized in stress test #' + (i+1));
+                                            }
+                                        }
+                                        
+                                        // Try to compute bounding sphere
+                                        geometry.computeBoundingSphere();
+                                        testCount++;
+                                        
+                                    } catch (error) {
+                                        errorCount++;
+                                        if (error.message.includes('NaN')) {
+                                            console.log('🚨 STRESS TEST ERROR #' + (i+1) + ': ' + error.message);
+                                        }
+                                    }
+                                }
+                                
+                                console.log('💥 Stress test complete: ' + testCount + ' passed, ' + errorCount + ' errors');
+                            }
+                        `;
+                        iframeDoc.head.appendChild(script);
+                        addToConsole('✅ Stress test script injected', 'success');
+                    }
+                } catch (e) {
+                    addToConsole(`❌ Stress test injection failed: ${e.message}`, 'error');
+                }
+            }, 1000);
+        }
+        
+        // Initialize monitoring
+        addToConsole('🎮 WebAI 3D NaN Error Detector initialized', 'info');
+        addToConsole('Waiting for game to load...', 'info');
+        
+        // Auto-start monitoring after page loads
+        setTimeout(() => {
+            startMonitoring();
+            
+            // Wait a bit more then run direct test
+            setTimeout(() => {
+                testDirectly();
+            }, 5000);
+        }, 3000);
+    </script>
+</body>
+</html>

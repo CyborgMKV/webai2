@@ -1,9 +1,9 @@
 import Entity from '../engine/entity.js';
 import Weapon from './weapon.js'; // Ensure this path is correct for your setup
+import PhysicsComponent from '../components/physics.js';
 import * as THREE from '../../libs/three/three.module.js';
 
-export default class Player extends Entity {
-    constructor(options = {}) {
+export default class Player extends Entity {    constructor(options = {}) {
         super(); 
         this.type = 'player';
         this.state = 'active';
@@ -11,6 +11,19 @@ export default class Player extends Entity {
         this.velocity = options.velocity || { x: 0, y: 0, z: 0 };
         this.model = options.model || null; 
         this.game = options.game; 
+
+        // Initialize physics component
+        const physicsOptions = {
+            type: 'dynamic',
+            shape: 'capsule',
+            mass: 1.0,
+            radius: 0.5,
+            height: 2.0,
+            friction: 0.7,
+            restitution: 0.1,
+            lockRotation: { x: true, y: false, z: true } // Lock X and Z rotation, allow Y (turning)
+        };
+        this.addComponent('physics', new PhysicsComponent(physicsOptions));
 
         let initialMaxHealth = 100;
         if (this.game && this.game.config && this.game.config.player && typeof this.game.config.player.maxHealth === 'number') {
@@ -143,9 +156,17 @@ export default class Player extends Entity {
                  await this.equipWeapon(weaponNameToEquip);
             }
         }
-    }
-
-    update(deltaTime, game) {
+    }    update(deltaTime, game) {
+        // Update physics body position if physics is available
+        const physicsComponent = this.getComponent('physics');
+        if (physicsComponent && physicsComponent.rigidBody && game.physicsManager) {
+            // Sync position from physics body to entity
+            const physicsPos = physicsComponent.rigidBody.translation();
+            this.position.x = physicsPos.x;
+            this.position.y = physicsPos.y;
+            this.position.z = physicsPos.z;
+        }
+        
         if (this.model) {
             this.model.position.copy(this.position);
         }
@@ -177,13 +198,19 @@ export default class Player extends Entity {
         console.log(`Player.shoot: Current ammo: ${this.ammo}/${this.maxAmmo}. Firing ${this.currentWeapon.weaponName}. (v2)`);
 
         const shootOrigin = new THREE.Vector3();
-        this.currentWeapon.model.getWorldPosition(shootOrigin); 
-
-        const shootDirection = new THREE.Vector3();
+        this.currentWeapon.model.getWorldPosition(shootOrigin);        const shootDirection = new THREE.Vector3();
         let localForward = this.currentWeapon.config.localForwardVector || new THREE.Vector3(0, 0, 1); 
         
         const worldForward = this.currentWeapon.model.localToWorld(localForward.clone());
-        shootDirection.subVectors(worldForward, shootOrigin).normalize();
+        shootDirection.subVectors(worldForward, shootOrigin);
+        
+        // Safely normalize the shoot direction to prevent NaN in BufferGeometry
+        const length = shootDirection.length();
+        if (length === 0 || !isFinite(length)) {
+            console.warn('Player shoot direction has zero or invalid length, using weapon forward direction');
+            shootDirection.copy(localForward);
+        }
+        shootDirection.normalize();
         
         console.log("Player.shoot: Calling this.currentWeapon.shoot(). Origin:", shootOrigin, "Direction:", shootDirection, "(v2)");
         const fired = this.currentWeapon.shoot(shootOrigin, shootDirection);

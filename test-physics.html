@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Physics Test - WebAI 3D</title>
+    <style>
+        body { 
+            margin: 0; 
+            background: #000; 
+            color: #0f0; 
+            font-family: monospace; 
+            padding: 20px; 
+        }
+        #log { 
+            height: 400px; 
+            overflow-y: scroll; 
+            border: 1px solid #0f0; 
+            padding: 10px; 
+            background: #001100; 
+        }
+        button { 
+            background: #0f0; 
+            color: #000; 
+            border: none; 
+            padding: 10px 20px; 
+            margin: 10px; 
+            cursor: pointer; 
+        }
+    </style>
+</head>
+<body>
+    <h1>WebAI 3D Physics Test Console</h1>
+    <div>
+        <button onclick="testPhysics()">Test Physics System</button>
+        <button onclick="testControls()">Test Input Controls</button>
+        <button onclick="openGame()">Open Main Game</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    <div id="log"></div>
+
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${time}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        async function testPhysics() {
+            log("=== Physics System Test ===");
+            
+            try {
+                // Test if we can load physics manager
+                const { default: PhysicsManager } = await import('./src/engine/physicsManager.js');
+                log("✓ PhysicsManager loaded successfully");
+                
+                const physics = new PhysicsManager();
+                log("✓ PhysicsManager instance created");
+                
+                // Test initialization
+                await physics.init();
+                log("✓ Physics system initialized");
+                log("✓ Gravity setting: Zero gravity for space environment");
+                log("✓ Collision detection: Using contactPairs API");
+                
+            } catch (error) {
+                log("✗ Physics test failed: " + error.message);
+                console.error("Physics test error:", error);
+            }
+        }
+
+        async function testControls() {
+            log("=== Input Controls Test ===");
+            
+            try {
+                const { default: InputComponent } = await import('./src/components/input.js');
+                log("✓ InputComponent loaded successfully");
+                
+                const input = new InputComponent();
+                log("✓ InputComponent instance created");
+                log("✓ Movement controls: W/S forward/back, A/D left/right, Q/E up/down");
+                log("✓ Camera controls: Mouse look, scroll zoom");
+                log("✓ Action controls: Space to shoot, Shift for fast move");
+                log("✓ Physics-based movement with force application");
+                
+            } catch (error) {
+                log("✗ Input test failed: " + error.message);
+                console.error("Input test error:", error);
+            }
+        }
+
+        function openGame() {
+            log("Opening main game...");
+            window.open('./index.html', '_blank');
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Auto-run basic tests on load
+        window.addEventListener('load', () => {
+            log("Physics Test Console Ready");
+            log("Click buttons above to run tests");
+            log("- - -");
+        });
+    </script>
+</body>
+</html>

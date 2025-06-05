@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shark Geometry NaN Fix Test</title>
+    <style>
+        body { margin: 0; background: #000; color: #fff; font-family: Arial, sans-serif; }
+        #container { width: 100vw; height: 100vh; position: relative; }
+        #info { position: absolute; top: 10px; left: 10px; z-index: 100; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; max-width: 400px; }
+        #log { position: absolute; bottom: 10px; left: 10px; z-index: 100; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; max-width: 600px; max-height: 300px; overflow-y: auto; font-size: 12px; }
+        .error { color: #ff6b6b; }
+        .warning { color: #ffa726; }
+        .success { color: #66bb6a; }
+        .info { color: #42a5f5; }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="info">
+        <h3>Shark Geometry NaN Fix Test</h3>
+        <p>Testing BufferGeometry NaN error fixes in shark model...</p>
+        <div id="status">Initializing...</div>
+    </div>
+    <div id="log"></div>
+
+    <script type="module">
+        import * as THREE from './libs/three/three.module.js';
+        import { GLTFLoader } from './libs/three/loaders/GLTFLoader.js';
+
+        // Import our math utilities
+        import { sanitizeGeometry, safeNormalize, sanitizePosition } from './src/utils/math.js';
+
+        const container = document.getElementById('container');
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('log');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(div);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        // Set up Three.js scene
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x001122);
+        container.appendChild(renderer.domElement);
+
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        // Position camera
+        camera.position.set(0, 2, 5);
+        camera.lookAt(0, 0, 0);
+
+        let sharkMesh = null;
+        let mixer = null;
+
+        statusDiv.textContent = 'Loading shark model...';
+        log('Starting shark model test...', 'info');
+
+        // Override console methods to capture THREE.js warnings
+        const originalWarn = console.warn;
+        const originalError = console.error;
+
+        console.warn = function(...args) {
+            const message = args.join(' ');
+            if (message.includes('BufferGeometry') || message.includes('NaN') || message.includes('radius')) {
+                log(`THREE.js Warning: ${message}`, 'warning');
+            }
+            originalWarn.apply(console, args);
+        };
+
+        console.error = function(...args) {
+            const message = args.join(' ');
+            if (message.includes('BufferGeometry') || message.includes('NaN') || message.includes('radius')) {
+                log(`THREE.js Error: ${message}`, 'error');
+            }
+            originalError.apply(console, args);
+        };
+
+        // Test function to validate geometry
+        function validateGeometry(geometry, name) {
+            log(`Validating geometry for: ${name}`, 'info');
+            
+            if (!geometry || !geometry.attributes) {
+                log(`No geometry attributes found for ${name}`, 'warning');
+                return false;
+            }
+
+            const position = geometry.attributes.position;
+            if (!position) {
+                log(`No position attribute found for ${name}`, 'warning');
+                return false;
+            }
+
+            const positions = position.array;
+            let nanCount = 0;
+            let infinityCount = 0;
+
+            for (let i = 0; i < positions.length; i++) {
+                if (isNaN(positions[i])) {
+                    nanCount++;
+                } else if (!isFinite(positions[i])) {
+                    infinityCount++;
+                }
+            }
+
+            if (nanCount > 0 || infinityCount > 0) {
+                log(`Geometry validation FAILED for ${name}: ${nanCount} NaN values, ${infinityCount} Infinity values`, 'error');
+                return false;
+            } else {
+                log(`Geometry validation PASSED for ${name}: ${positions.length} position values, all finite`, 'success');
+                return true;
+            }
+        }
+
+        // Test bounding sphere computation
+        function testBoundingSphere(geometry, name) {
+            log(`Testing bounding sphere computation for: ${name}`, 'info');
+            
+            try {
+                geometry.computeBoundingSphere();
+                const radius = geometry.boundingSphere.radius;
+                
+                if (isNaN(radius) || !isFinite(radius)) {
+                    log(`Bounding sphere computation FAILED for ${name}: radius = ${radius}`, 'error');
+                    return false;
+                } else {
+                    log(`Bounding sphere computation PASSED for ${name}: radius = ${radius.toFixed(3)}`, 'success');
+                    return true;
+                }
+            } catch (error) {
+                log(`Bounding sphere computation ERROR for ${name}: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // Load shark model
+        const loader = new GLTFLoader();
+        loader.load('./assets/models/shark.glb', 
+            (gltf) => {
+                log('Shark model loaded successfully', 'success');
+                statusDiv.textContent = 'Model loaded, analyzing geometry...';
+
+                sharkMesh = gltf.scene;
+                scene.add(sharkMesh);
+
+                // Test each mesh in the model
+                let totalMeshes = 0;
+                let validMeshes = 0;
+                let sanitizedMeshes = 0;
+
+                sharkMesh.traverse((child) => {
+                    if (child.isMesh && child.geometry) {
+                        totalMeshes++;
+                        const meshName = child.name || `Mesh_${totalMeshes}`;
+                        
+                        log(`Found mesh: ${meshName}`, 'info');
+
+                        // Validate geometry before sanitization
+                        const isValidBefore = validateGeometry(child.geometry, `${meshName} (before)`);
+                        const sphereValidBefore = testBoundingSphere(child.geometry, `${meshName} (before)`);
+
+                        if (!isValidBefore) {
+                            log(`Sanitizing geometry for: ${meshName}`, 'warning');
+                            sanitizeGeometry(child.geometry);
+                            sanitizedMeshes++;
+
+                            // Validate after sanitization
+                            const isValidAfter = validateGeometry(child.geometry, `${meshName} (after)`);
+                            const sphereValidAfter = testBoundingSphere(child.geometry, `${meshName} (after)`);
+
+                            if (isValidAfter && sphereValidAfter) {
+                                log(`Sanitization successful for: ${meshName}`, 'success');
+                                validMeshes++;
+                            } else {
+                                log(`Sanitization failed for: ${meshName}`, 'error');
+                            }
+                        } else if (sphereValidBefore) {
+                            validMeshes++;
+                        }
+                    }
+                });
+
+                log(`Analysis complete: ${totalMeshes} meshes found, ${validMeshes} valid, ${sanitizedMeshes} sanitized`, 'info');
+                
+                if (validMeshes === totalMeshes) {
+                    statusDiv.textContent = `✅ All ${totalMeshes} meshes are valid!`;
+                    log('🎉 ALL TESTS PASSED - No BufferGeometry NaN errors detected!', 'success');
+                } else {
+                    statusDiv.textContent = `⚠️ ${totalMeshes - validMeshes} meshes still have issues`;
+                    log(`❌ ${totalMeshes - validMeshes} meshes still have geometry issues`, 'error');
+                }
+
+                // Set up animations if available
+                if (gltf.animations && gltf.animations.length) {
+                    mixer = new THREE.AnimationMixer(sharkMesh);
+                    const action = mixer.clipAction(gltf.animations[0]);
+                    action.play();
+                    log(`Animation started: ${gltf.animations[0].name}`, 'info');
+                }
+            },
+            (progress) => {
+                const percent = Math.round((progress.loaded / progress.total) * 100);
+                statusDiv.textContent = `Loading... ${percent}%`;
+            },
+            (error) => {
+                log(`Model loading failed: ${error.message}`, 'error');
+                statusDiv.textContent = '❌ Model loading failed';
+            }
+        );
+
+        // Animation loop
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = clock.getDelta();
+            if (mixer) mixer.update(delta);
+
+            // Rotate the shark slowly
+            if (sharkMesh) {
+                sharkMesh.rotation.y += 0.01;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        log('Shark geometry test initialized', 'info');
+    </script>
+</body>
+</html>

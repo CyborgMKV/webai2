@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Project Diagnosis</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            margin: 0;
+        }
+        .header {
+            text-align: center;
+            color: #4caf50;
+            border-bottom: 2px solid #4caf50;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .status {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #4caf50;
+        }
+        .error {
+            border-left-color: #f44336;
+            background: rgba(244, 67, 54, 0.1);
+        }
+        .warning {
+            border-left-color: #ff9800;
+            background: rgba(255, 152, 0, 0.1);
+        }
+        .success {
+            border-left-color: #4caf50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+        .console {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+        iframe {
+            width: 100%;
+            height: 400px;
+            border: 1px solid #4caf50;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 Quick Project Diagnosis</h1>
+        <p>Checking if WebAI 3D is actually working...</p>
+    </div>
+
+    <div id="status-container">
+        <div class="status" id="loading-status">
+            <h3>📦 Loading Application...</h3>
+            <p>Initializing diagnostic checks...</p>
+        </div>
+    </div>
+
+    <h3>🎮 Live Application:</h3>
+    <iframe src="index.html" id="app-frame"></iframe>
+
+    <h3>📊 Console Output:</h3>
+    <div class="console" id="console-output"></div>
+
+    <script>
+        let consoleOutput = document.getElementById('console-output');
+        let statusContainer = document.getElementById('status-container');
+        let diagnosticResults = {
+            appLoaded: false,
+            threeJSLoaded: false,
+            webglWorking: false,
+            errorsFound: [],
+            warnings: []
+        };
+
+        function addStatus(type, title, message) {
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = `<h3>${title}</h3><p>${message}</p>`;
+            statusContainer.appendChild(statusDiv);
+        }
+
+        function logToConsole(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'warning' ? '⚠️' : type === 'success' ? '✅' : 'ℹ️';
+            consoleOutput.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        // Override console methods to capture app errors
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        const originalConsoleLog = console.log;
+
+        console.error = function(...args) {
+            originalConsoleError.apply(console, args);
+            const message = args.join(' ');
+            diagnosticResults.errorsFound.push(message);
+            logToConsole(message, 'error');
+        };
+
+        console.warn = function(...args) {
+            originalConsoleWarn.apply(console, args);
+            const message = args.join(' ');
+            diagnosticResults.warnings.push(message);
+            logToConsole(message, 'warning');
+        };
+
+        // Monitor the iframe for errors
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'error') {
+                diagnosticResults.errorsFound.push(event.data.message);
+                logToConsole(`App Error: ${event.data.message}`, 'error');
+            }
+        });
+
+        // Test basic functionality
+        setTimeout(() => {
+            logToConsole('Starting diagnostic checks...', 'info');
+            
+            // Check if Three.js is available globally
+            if (typeof THREE !== 'undefined') {
+                diagnosticResults.threeJSLoaded = true;
+                logToConsole('Three.js is loaded globally', 'success');
+                addStatus('success', '✅ Three.js Loaded', 'Three.js library is available globally');
+            } else {
+                logToConsole('Three.js not found globally (might be in modules)', 'warning');
+                addStatus('warning', '⚠️ Three.js Status', 'Three.js not found globally, checking iframe...');
+            }
+
+            // Check WebGL support
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (gl) {
+                diagnosticResults.webglWorking = true;
+                logToConsole('WebGL context created successfully', 'success');
+                addStatus('success', '✅ WebGL Support', 'WebGL is supported and working');
+            } else {
+                logToConsole('WebGL not supported or failed to create context', 'error');
+                addStatus('error', '❌ WebGL Failed', 'WebGL context creation failed');
+            }
+
+            // Check app frame after delay
+            setTimeout(() => {
+                const iframe = document.getElementById('app-frame');
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    if (iframeDoc && iframeDoc.readyState === 'complete') {
+                        diagnosticResults.appLoaded = true;
+                        logToConsole('Application iframe loaded successfully', 'success');
+                        addStatus('success', '✅ App Loaded', 'Main application loaded in iframe');
+                        
+                        // Check for app-specific objects
+                        const iframeWindow = iframe.contentWindow;
+                        if (iframeWindow.debugGame) {
+                            logToConsole('Debug objects available - fixes are integrated', 'success');
+                            addStatus('success', '✅ Debug Tools', 'WebGL fix debug tools are available');
+                        } else {
+                            logToConsole('Debug objects not found - fixes may not be integrated', 'warning');
+                            addStatus('warning', '⚠️ Debug Tools', 'WebGL fix debug tools not detected');
+                        }
+                    } else {
+                        logToConsole('Application iframe failed to load properly', 'error');
+                        addStatus('error', '❌ App Load Failed', 'Main application failed to load');
+                    }
+                } catch (error) {
+                    logToConsole(`Error checking iframe: ${error.message}`, 'error');
+                    addStatus('error', '❌ App Check Failed', `Cannot access iframe: ${error.message}`);
+                }
+
+                // Final summary
+                setTimeout(() => {
+                    const errorCount = diagnosticResults.errorsFound.length;
+                    const warningCount = diagnosticResults.warnings.length;
+                    
+                    logToConsole('\n=== DIAGNOSTIC SUMMARY ===', 'info');
+                    logToConsole(`Errors found: ${errorCount}`, errorCount > 0 ? 'error' : 'success');
+                    logToConsole(`Warnings: ${warningCount}`, warningCount > 0 ? 'warning' : 'success');
+                    logToConsole(`WebGL working: ${diagnosticResults.webglWorking}`, diagnosticResults.webglWorking ? 'success' : 'error');
+                    logToConsole(`App loaded: ${diagnosticResults.appLoaded}`, diagnosticResults.appLoaded ? 'success' : 'error');
+
+                    if (errorCount === 0 && diagnosticResults.webglWorking && diagnosticResults.appLoaded) {
+                        addStatus('success', '🎉 PROJECT STATUS: WORKING', 'No critical errors detected! The project appears to be functioning correctly.');
+                        logToConsole('✅ PROJECT IS WORKING! No critical issues found.', 'success');
+                    } else {
+                        addStatus('error', '🚨 PROJECT STATUS: ISSUES DETECTED', `Found ${errorCount} errors and ${warningCount} warnings that need attention.`);
+                        logToConsole('❌ PROJECT HAS ISSUES that need to be fixed.', 'error');
+                    }
+                }, 3000);
+            }, 2000);
+        }, 1000);
+
+        // Remove loading status
+        setTimeout(() => {
+            document.getElementById('loading-status').remove();
+        }, 500);
+
+        logToConsole('Diagnostic tool initialized', 'success');
+    </script>
+</body>
+</html>

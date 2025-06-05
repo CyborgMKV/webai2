@@ -1,25 +1,51 @@
 import * as THREE from '../../libs/three/three.module.js';
 import Entity from '../engine/entity.js';
+import PhysicsComponent from '../components/physics.js';
 
 class Projectile extends Entity {
     constructor(options = {}) {
         super(); 
         this.type = 'projectile';
         this.name = options.name || 'Projectile (v4)'; // Changed to v4
-        
-        this.scene = options.scene;
+          this.scene = options.scene;
         this.origin = options.origin ? options.origin.clone() : new THREE.Vector3(0,0,0); 
-        this.direction = options.direction ? options.direction.clone().normalize() : new THREE.Vector3(0,0,1); 
-        this.speed = options.speed || 10; 
+        
+        // Safely handle direction vector to prevent NaN in BufferGeometry
+        if (options.direction) {
+            const dir = options.direction.clone();
+            const length = dir.length();
+            
+            // Check for zero or invalid length before normalizing
+            if (length === 0 || !isFinite(length)) {
+                console.warn('Projectile created with zero or invalid direction vector, using default direction');
+                this.direction = new THREE.Vector3(0, 0, 1);
+            } else {
+                this.direction = dir.normalize();
+            }
+        } else {
+            this.direction = new THREE.Vector3(0, 0, 1);
+        }
+        
+        this.speed = options.speed || 10;
         this.damage = options.damage || 5;
         this.lifespan = options.lifespan || 2; 
         this.color = options.color || 0xffffff;
         this.size = options.size || 0.1;
         this.shooter = options.shooter; 
-        this.game = this.shooter ? this.shooter.game : null; 
-
-        this.startTime = performance.now();
+        this.game = this.shooter ? this.shooter.game : null;        this.startTime = performance.now();
         this.active = true;
+
+        // Initialize physics component for projectiles
+        const physicsOptions = {
+            type: 'kinematic', // Kinematic for controlled movement
+            shape: 'sphere',
+            radius: this.size,
+            mass: 0.1,
+            friction: 0.0,
+            restitution: 0.0,
+            isSensor: true // Make it a sensor for collision detection without physics response
+        };
+        this.addComponent('physics', new PhysicsComponent(physicsOptions));
 
         console.log(`Projectile.constructor: Creating projectile "${this.name}". Origin:`, this.origin, `Direction:`, this.direction, `Speed: ${this.speed}, Damage: ${this.damage}, Shooter:`, this.shooter ? this.shooter.type : 'N/A', '(v4)');
 
@@ -45,9 +71,7 @@ class Projectile extends Entity {
         
         this.raycaster = new THREE.Raycaster();
         this.raycaster.near = 0.01; 
-    }
-
-    update(deltaTime, game) { 
+    }    update(deltaTime, game) { 
         if (!this.active) return;
 
         const elapsedTime = (performance.now() - this.startTime) / 1000;
@@ -59,11 +83,24 @@ class Projectile extends Entity {
 
         const distanceThisFrame = this.speed * deltaTime;
         const oldPosition = this.mesh.position.clone();
-        this.mesh.position.addScaledVector(this.direction, distanceThisFrame);
-        console.log(`Projectile.update: Projectile "${this.name}" moved to:`, this.mesh.position, `Old pos:`, oldPosition, `Distance: ${distanceThisFrame} (v4)`); // UNCOMMENTED and added oldPos
+        
+        // Update position using physics if available, otherwise fallback to direct movement
+        const physicsComponent = this.getComponent('physics');
+        if (physicsComponent && physicsComponent.rigidBody && game.physicsManager) {
+            // Move using physics
+            const newPos = oldPosition.clone().addScaledVector(this.direction, distanceThisFrame);
+            physicsComponent.rigidBody.setTranslation(newPos, true);
+            this.mesh.position.copy(newPos);
+        } else {
+            // Fallback to direct movement
+            this.mesh.position.addScaledVector(this.direction, distanceThisFrame);
+        }
+        
+        // console.log(`Projectile.update: Projectile "${this.name}" moved to:`, this.mesh.position, `Old pos:`, oldPosition, `Distance: ${distanceThisFrame} (v4)`);
 
+        // Keep existing collision detection for now (will be replaced by physics collision events later)
         this.raycaster.set(oldPosition, this.direction);
-        this.raycaster.far = distanceThisFrame * 1.1; 
+        this.raycaster.far = distanceThisFrame * 1.1;
 
         const potentialTargets = [];
         if (this.scene) { 
@@ -89,6 +126,21 @@ class Projectile extends Entity {
 
         if (intersects.length > 0) {
             const firstHit = intersects[0];
+
+            // ---- DETAILED LOGGING FOR COLLISION ----
+            console.log(`---- Projectile Hit Details ----`);
+            console.log(`Projectile Name: ${this.name}`);
+            console.log(`Hit Object Name: ${firstHit.object.name}`);
+            console.log(`Hit Object UUID: ${firstHit.object.uuid}`);
+            console.log(`Hit Distance (Raycaster): ${firstHit.distance.toFixed(3)}`);
+            console.log(`Hit Point (World Coords): X=${firstHit.point.x.toFixed(3)}, Y=${firstHit.point.y.toFixed(3)}, Z=${firstHit.point.z.toFixed(3)}`);
+            console.log(`Projectile's Target Movement Distance This Frame (distanceThisFrame): ${distanceThisFrame.toFixed(3)}`);
+            console.log(`Projectile Position (Old): X=${oldPosition.x.toFixed(3)}, Y=${oldPosition.y.toFixed(3)}, Z=${oldPosition.z.toFixed(3)}`);
+            console.log(`Projectile Position (New/Current): X=${this.mesh.position.x.toFixed(3)}, Y=${this.mesh.position.y.toFixed(3)}, Z=${this.mesh.position.z.toFixed(3)}`);
+            console.log(`Shooter: ${this.shooter ? this.shooter.type + (this.shooter.name ? ' (' + this.shooter.name + ')' : '') : 'N/A'}`);
+            console.log(`--------------------------------`);
+            // ---- END OF DETAILED LOGGING ----
+
             if (firstHit.distance <= distanceThisFrame) { 
                 const hitEntity = firstHit.object.userData.entityInstance;
                 console.log(`Projectile.update: Projectile "${this.name}" HIT object:`, firstHit.object.name, "Entity:", hitEntity ? hitEntity.type : 'N/A', "at distance:", firstHit.distance, "(v4)");

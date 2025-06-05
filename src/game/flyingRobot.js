@@ -1,7 +1,9 @@
 import * as THREE from '../../libs/three/three.module.js';
 import { GLTFLoader } from '../../libs/three/loaders/GLTFLoader.js';
 import Entity from '../engine/entity.js';
+import PhysicsComponent from '../components/physics.js';
 import Heart from './heart.js';
+import { sanitizeGeometry } from '../utils/math.js';
 
 /**
  * flyingRobot entity for the arcade game.
@@ -39,10 +41,21 @@ export default class FlyingRobot extends Entity {
         this.spawnTime = performance.now();
         this.regrowTimer = null;
         this.isSilver = !!options.isSilver;
-        this.isGold = !!options.isGold;
-        this.scoreValue = options.scoreValue || 100;
+        this.isGold = !!options.isGold;        this.scoreValue = options.scoreValue || 100;
         this.initComponents(options.components || []);
-        this.mesh = null;
+        this.mesh = null;        // Initialize physics component for flying robot with stable settings
+        const physicsOptions = {
+            type: 'dynamic',
+            shape: 'box',
+            size: { x: 1.5, y: 1.5, z: 1.5 }, // Approximate robot dimensions
+            mass: 1.0, // Reduced mass for better responsiveness
+            friction: 0.2, // Increased friction for stability
+            restitution: 0.1, // Reduced bounce for stability
+            lockRotation: { x: true, y: false, z: true }, // Lock X and Z rotation to prevent tumbling
+            linearDamping: 0.3, // Add linear damping to prevent excessive speed
+            angularDamping: 0.5 // Add angular damping to prevent spinning
+        };
+        this.addComponent('physics', new PhysicsComponent(physicsOptions));
 
         // Create the heart entity
         this.heart = new Heart({
@@ -58,14 +71,23 @@ export default class FlyingRobot extends Entity {
                 this.heart.mesh.position.set(0, 1, 0); // Offset above robot
                 robotModel.add(this.heart.mesh);
             }
-        };
-
-        // Load the GLB model
+        };        // Load the GLB model
         const loader = new GLTFLoader();
         loader.load(
             'assets/models/flyingRobot.glb',
             (gltf) => {
                 this.mesh = gltf.scene;
+                
+                // Sanitize geometry to prevent NaN values in BufferGeometry
+                this.mesh.traverse((child) => {
+                    if (child.isMesh && child.geometry) {
+                        const wasSanitized = sanitizeGeometry(child.geometry);
+                        if (wasSanitized) {
+                            console.log(`FlyingRobot: Sanitized geometry for flying robot mesh`);
+                        }
+                    }
+                });
+                
                 this.mesh.position.copy(this.position);
                 this.heart.mesh.position.set(0, 1, 0); // Offset above robot
                 this.setMeshTransparent(this.mesh, 0.5); //Make model semitransparent
@@ -114,17 +136,70 @@ export default class FlyingRobot extends Entity {
                 break;
         }
         super.update(deltaTime, game);
-    }
-
-    updateActive(deltaTime, game) {
-        // Move robot
-        this.position.addScaledVector(this.velocity, this.speed * deltaTime);
-
-        // Sync mesh position with entity position
-        if (this.mesh) {
-            this.mesh.position.copy(this.position);
+    }    updateActive(deltaTime, game) {
+        // Apply AI movement using physics if available
+        const physicsComponent = this.getComponent('physics');
+        if (physicsComponent && physicsComponent.rigidBody) {
+            // Use physics-based movement for AI behavior only
+            const aiForce = {
+                x: this.velocity.x * this.speed * 2,
+                y: this.velocity.y * this.speed * 2,
+                z: this.velocity.z * this.speed * 2
+            };
+            // Validate force values before applying
+            if (isFinite(aiForce.x) && isFinite(aiForce.y) && isFinite(aiForce.z)) {
+                try {
+                    physicsComponent.rigidBody.addForce(aiForce, true);
+                } catch (e) {
+                    console.error('FlyingRobot: Error applying force to rigidBody:', e, aiForce);
+                }
+            } else {
+                console.warn('FlyingRobot: Skipping addForce due to invalid aiForce:', aiForce);
+            }
+            // Update entity position from physics (this is the single source of truth)
+            let physicsPos;
+            try {
+                physicsPos = physicsComponent.rigidBody.translation();
+            } catch (e) {
+                console.error('FlyingRobot: Error reading rigidBody position:', e);
+                return;
+            }
+            if (
+                physicsPos &&
+                isFinite(physicsPos.x) &&
+                isFinite(physicsPos.y) &&
+                isFinite(physicsPos.z)
+            ) {
+                this.position.set(physicsPos.x, physicsPos.y, physicsPos.z);
+                if (this.mesh) {
+                    this.mesh.position.set(physicsPos.x, physicsPos.y, physicsPos.z);
+                }
+            } else {
+                console.warn('FlyingRobot: Skipping position sync due to invalid physicsPos:', physicsPos);
+            }
+        } else {
+            // Fallback to direct movement if no physics
+            this.position.addScaledVector(this.velocity, this.speed * deltaTime);
+            if (this.mesh) {
+                this.mesh.position.copy(this.position);
+            }
         }
-        // TODO: Add AI, lock-on, etc.
+        // Simple AI: fly toward player if available
+        if (game && game.player) {
+            const direction = new THREE.Vector3().subVectors(game.player.position, this.position);
+            const length = direction.length();
+            if (length === 0 || !isFinite(length)) {
+                console.warn('FlyingRobot direction has zero or invalid length, skipping movement');
+                return; // Skip movement this frame
+            }
+            direction.normalize();
+            // Only update velocity if direction is valid
+            if (isFinite(direction.x) && isFinite(direction.y) && isFinite(direction.z)) {
+                this.velocity.lerp(direction, deltaTime * 0.5);
+            } else {
+                console.warn('FlyingRobot: Skipping velocity update due to invalid direction:', direction);
+            }
+        }
     }
 
     updateHeart(deltaTime, game) {

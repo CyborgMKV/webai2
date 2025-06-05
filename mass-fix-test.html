@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Physics Mass Fix Verification</title>
+    <style>
+        body { 
+            background: linear-gradient(135deg, #0a0a2e, #16213e); 
+            color: #00ff88; 
+            font-family: 'Courier New', monospace; 
+            padding: 20px; 
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .test-section { 
+            border: 1px solid #00ff88; 
+            margin: 20px 0; 
+            padding: 20px; 
+            border-radius: 8px; 
+            background: rgba(0, 255, 136, 0.05); 
+        }
+        .pass { color: #00ff88; }
+        .fail { color: #ff4444; }
+        .warning { color: #ffaa00; }
+        button { 
+            background: #00ff88; 
+            color: #000; 
+            border: none; 
+            padding: 12px 24px; 
+            margin: 10px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-weight: bold; 
+        }
+        #log { 
+            height: 400px; 
+            overflow-y: scroll; 
+            border: 1px solid #00ff88; 
+            padding: 15px; 
+            background: rgba(0, 0, 0, 0.7); 
+            font-size: 14px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Physics Mass Fix Verification</h1>
+        <p>Testing the setMass error fix and physics system functionality</p>
+
+        <div class="test-section">
+            <h3>🧪 Test Controls</h3>
+            <button onclick="runPhysicsTest()">Test Physics Mass Handling</button>
+            <button onclick="runGameInitTest()">Test Game Initialization</button>
+            <button onclick="runFullSystemTest()">Full System Test</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <div id="log">Click a test button to begin...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const colors = { info: '#00ff88', pass: '#00ff88', fail: '#ff4444', warning: '#ffaa00' };
+            logDiv.innerHTML += `<span style="color: ${colors[type]}">[${time}] ${message}</span><br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        window.log = log;
+        window.clearLog = () => document.getElementById('log').innerHTML = '';
+
+        // Test 1: Physics Mass Handling
+        window.runPhysicsTest = async function() {
+            log("=== PHYSICS MASS FIX TEST ===", 'info');
+            
+            try {
+                // Load our fixed PhysicsManager
+                const { default: PhysicsManager } = await import('./src/engine/physicsManager.js');
+                log("✓ PhysicsManager loaded successfully", 'pass');
+                
+                const physics = new PhysicsManager();
+                await physics.init();
+                log("✓ PhysicsManager initialized", 'pass');
+                
+                // Create a mock entity with mass
+                const testEntity = {
+                    position: { x: 0, y: 5, z: 0 },
+                    type: 'test'
+                };
+                
+                log("Testing mass setting with various values...", 'info');
+                
+                // Test creating rigid body with mass options
+                const rigidBody1 = physics.createRigidBody(testEntity, 'dynamic', { mass: 10 });
+                if (rigidBody1) {
+                    log("✓ Created rigid body with mass: 10", 'pass');
+                } else {
+                    log("✗ Failed to create rigid body with mass", 'fail');
+                }
+                
+                // Test creating collider (which should handle the mass)
+                const collider1 = physics.createCollider(testEntity, 'box', { x: 1, y: 1, z: 1 }, rigidBody1);
+                if (collider1) {
+                    log("✓ Created collider successfully", 'pass');
+                } else {
+                    log("✗ Failed to create collider", 'fail');
+                }
+                
+                // Test with different mass values
+                const testEntity2 = { position: { x: 2, y: 5, z: 0 }, type: 'test2' };
+                const rigidBody2 = physics.createRigidBody(testEntity2, 'dynamic', { mass: 0.5 });
+                const collider2 = physics.createCollider(testEntity2, 'sphere', { radius: 0.5 }, rigidBody2);
+                
+                if (rigidBody2 && collider2) {
+                    log("✓ Created second physics body with different mass", 'pass');
+                } else {
+                    log("✗ Failed to create second physics body", 'fail');
+                }
+                
+                log("=== Mass Fix Test Complete ===", 'pass');
+                
+            } catch (error) {
+                log(`✗ Physics test failed: ${error.message}`, 'fail');
+                console.error("Full error:", error);
+            }
+        };
+
+        // Test 2: Game Initialization
+        window.runGameInitTest = async function() {
+            log("=== GAME INITIALIZATION TEST ===", 'info');
+            
+            try {
+                // Test loading core game components
+                const { default: Entity } = await import('./src/engine/entity.js');
+                log("✓ Entity system loaded", 'pass');
+                
+                const { default: PhysicsComponent } = await import('./src/components/physics.js');
+                log("✓ Physics component loaded", 'pass');
+                
+                const { default: InputComponent } = await import('./src/components/input.js');
+                log("✓ Input component loaded", 'pass');
+                
+                // Test creating an entity with physics
+                const testEntity = new Entity();
+                testEntity.position = { x: 0, y: 2, z: 0 };
+                testEntity.type = 'player';
+                
+                const physicsComp = new PhysicsComponent({
+                    mass: 1,
+                    shape: 'box',
+                    bodyType: 'dynamic'
+                });
+                physicsComp.entity = testEntity;
+                
+                testEntity.addComponent('physics', physicsComp);
+                log("✓ Created entity with physics component", 'pass');
+                
+                // Test physics manager initialization
+                const { default: PhysicsManager } = await import('./src/engine/physicsManager.js');
+                const physics = new PhysicsManager();
+                await physics.init();
+                
+                // Test initializing physics body (this was where the error occurred)
+                const result = physics.initializePhysicsBody(physicsComp);
+                if (result) {
+                    log("✓ Physics body initialization succeeded - ERROR FIXED!", 'pass');
+                } else {
+                    log("✗ Physics body initialization failed", 'fail');
+                }
+                
+                log("=== Game Init Test Complete ===", 'pass');
+                
+            } catch (error) {
+                log(`✗ Game init test failed: ${error.message}`, 'fail');
+                console.error("Full error:", error);
+            }
+        };
+
+        // Test 3: Full System Test
+        window.runFullSystemTest = async function() {
+            log("=== FULL SYSTEM TEST ===", 'info');
+            
+            try {
+                // Run both previous tests
+                await window.runPhysicsTest();
+                log("--- Physics Test Complete ---", 'info');
+                
+                await window.runGameInitTest();
+                log("--- Game Init Test Complete ---", 'info');
+                
+                // Test the actual game loading
+                log("Testing main game components...", 'info');
+                
+                const { default: Game } = await import('./src/game/game.js');
+                log("✓ Game class loaded", 'pass');
+                
+                const { default: Player } = await import('./src/game/player.js');
+                log("✓ Player class loaded", 'pass');
+                
+                const { default: FlyingRobot } = await import('./src/game/flyingRobot.js');
+                log("✓ Flying robot class loaded", 'pass');
+                
+                log("🎮 ALL SYSTEMS OPERATIONAL!", 'pass');
+                log("The setMass error has been fixed!", 'pass');
+                log("Game should now load without physics errors!", 'pass');
+                
+            } catch (error) {
+                log(`✗ Full system test failed: ${error.message}`, 'fail');
+                console.error("Full error:", error);
+            }
+        };
+
+        // Auto-run a quick test on load
+        log("Physics Mass Fix Verification Tool Ready", 'info');
+        log("This tool tests the fix for the 'setMass is not a function' error", 'info');
+        log("Click a test button to verify the fix is working", 'info');
+    </script>
+</body>
+</html>

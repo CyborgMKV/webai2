@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebAI 3D - Console Monitor</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        .console-output { 
+            background: #000; 
+            color: #0f0; 
+            padding: 20px; 
+            border-radius: 8px; 
+            white-space: pre-wrap; 
+            font-family: monospace; 
+            max-height: 400px; 
+            overflow-y: auto; 
+            margin: 20px 0;
+        }
+        .error { color: #ff4444; }
+        .warn { color: #ffaa00; }
+        .info { color: #4488ff; }
+        .test-btn { 
+            background: #4CAF50; 
+            color: white; 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin: 5px; 
+        }
+        .test-btn:hover { background: #45a049; }
+        .iframe-container { 
+            width: 100%; 
+            height: 600px; 
+            border: 2px solid #333; 
+            border-radius: 8px; 
+            margin: 20px 0; 
+        }
+        .iframe-container iframe { 
+            width: 100%; 
+            height: 100%; 
+            border: none; 
+        }
+        .status { 
+            padding: 10px; 
+            border-radius: 4px; 
+            margin: 10px 0; 
+        }
+        .status.success { background: #2d5a2d; }
+        .status.error { background: #5a2d2d; }
+        .status.warning { background: #5a5a2d; }
+    </style>
+</head>
+<body>
+    <h1>🎮 WebAI 3D Game - Live Console Monitor</h1>
+    
+    <div class="status success">
+        <strong>✅ Status:</strong> Application is running on <a href="http://localhost:8000" target="_blank">http://localhost:8000</a>
+    </div>
+    
+    <button class="test-btn" onclick="testApp()">🔍 Test Main Application</button>
+    <button class="test-btn" onclick="clearConsole()">🧹 Clear Console</button>
+    <button class="test-btn" onclick="testBufferGeometry()">🔬 Test BufferGeometry</button>
+    
+    <div class="console-output" id="console"></div>
+    
+    <h2>🎯 Live Application (Click to interact)</h2>
+    <div class="iframe-container">
+        <iframe src="http://localhost:8000" id="gameFrame"></iframe>
+    </div>
+    
+    <script>
+        let originalConsole = {
+            log: console.log,
+            error: console.error,
+            warn: console.warn,
+            info: console.info
+        };
+        
+        let consoleDiv = document.getElementById('console');
+        let messageCount = 0;
+        
+        function addToConsole(message, type = 'log') {
+            const timestamp = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            consoleDiv.appendChild(div);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            messageCount++;
+            
+            // Keep only last 100 messages
+            if (messageCount > 100) {
+                consoleDiv.removeChild(consoleDiv.firstChild);
+                messageCount--;
+            }
+        }
+        
+        // Override console methods
+        console.log = function(...args) {
+            originalConsole.log.apply(console, args);
+            addToConsole(args.join(' '), 'log');
+        };
+        
+        console.error = function(...args) {
+            originalConsole.error.apply(console, args);
+            addToConsole(args.join(' '), 'error');
+        };
+        
+        console.warn = function(...args) {
+            originalConsole.warn.apply(console, args);
+            addToConsole(args.join(' '), 'warn');
+        };
+        
+        console.info = function(...args) {
+            originalConsole.info.apply(console, args);
+            addToConsole(args.join(' '), 'info');
+        };
+        
+        function clearConsole() {
+            consoleDiv.innerHTML = '';
+            messageCount = 0;
+            addToConsole('Console cleared', 'info');
+        }
+        
+        async function testApp() {
+            addToConsole('Testing main application...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:8000');
+                if (response.ok) {
+                    addToConsole('✅ Main application server is responding', 'info');
+                } else {
+                    addToConsole('❌ Main application server returned error: ' + response.status, 'error');
+                }
+            } catch (e) {
+                addToConsole('❌ Failed to connect to main application: ' + e.message, 'error');
+            }
+            
+            // Test if iframe can load
+            const iframe = document.getElementById('gameFrame');
+            iframe.onload = () => {
+                addToConsole('✅ Game iframe loaded successfully', 'info');
+            };
+            iframe.onerror = () => {
+                addToConsole('❌ Game iframe failed to load', 'error');
+            };
+        }
+        
+        async function testBufferGeometry() {
+            addToConsole('Testing BufferGeometry NaN detection...', 'info');
+            
+            // Import THREE.js and test
+            try {
+                // Since we can't import THREE.js modules directly here, 
+                // we'll create a simple test script that the iframe can execute
+                const iframe = document.getElementById('gameFrame');
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                
+                // Inject a test script into the iframe
+                const script = iframeDoc.createElement('script');
+                script.textContent = `
+                    if (window.THREE) {
+                        console.log('THREE.js is available in iframe');
+                        
+                        // Test creating geometry with NaN values
+                        try {
+                            const geometry = new THREE.BufferGeometry();
+                            const positions = new Float32Array([
+                                0, 0, 0,
+                                NaN, 1, 0,  // Intentional NaN
+                                1, 1, 0
+                            ]);
+                            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                            
+                            // This should trigger the error if not fixed
+                            geometry.computeBoundingSphere();
+                            console.log('❌ BufferGeometry with NaN did not throw error - this needs fixing!');
+                        } catch (e) {
+                            if (e.message.includes('NaN')) {
+                                console.log('✅ BufferGeometry correctly detected NaN values');
+                            } else {
+                                console.log('? BufferGeometry threw different error: ' + e.message);
+                            }
+                        }
+                    } else {
+                        console.log('THREE.js not yet available in iframe');
+                    }
+                `;
+                iframeDoc.head.appendChild(script);
+                
+                addToConsole('✅ BufferGeometry test script injected into iframe', 'info');
+            } catch (e) {
+                addToConsole('❌ Failed to inject test script: ' + e.message, 'error');
+            }
+        }
+        
+        // Initial test
+        setTimeout(testApp, 1000);
+        
+        // Monitor iframe console
+        setInterval(() => {
+            try {
+                const iframe = document.getElementById('gameFrame');
+                if (iframe.contentWindow && iframe.contentWindow.console) {
+                    // We can't directly access iframe console, but we've overridden it above
+                }
+            } catch (e) {
+                // Cross-origin restriction
+            }
+        }, 5000);
+        
+        addToConsole('🎮 Console monitor started. Watch for THREE.js BufferGeometry NaN errors...', 'info');
+    </script>
+</body>
+</html>

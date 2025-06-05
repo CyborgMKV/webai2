@@ -5,6 +5,7 @@
 import * as THREE from '../../libs/three/three.module.js';
 import { GLTFLoader } from '../../libs/three/loaders/GLTFLoader.js';
 import { DRACOLoader } from '../../libs/three/loaders/DRACOLoader.js';
+import { sanitizeGeometry } from '../utils/math.js';
 
 export default class ModelTester {
     constructor(containerId = null) {
@@ -38,9 +39,7 @@ export default class ModelTester {
         const dir = new THREE.DirectionalLight(0xffffff, 0.8);
         dir.position.set(3, 10, 10);
         this.scene.add(dir);
-    }
-
-    async loadModel(url) {
+    }    async loadModel(url) {
         const loader = new GLTFLoader();
         const dracoLoader = new DRACOLoader();
         dracoLoader.setDecoderPath('../../libs/three/draco/gltf/');
@@ -49,6 +48,17 @@ export default class ModelTester {
         const gltf = await loader.loadAsync(url);
         if (this.model) this.scene.remove(this.model);
         this.model = gltf.scene;
+        
+        // Sanitize geometry to prevent NaN values in BufferGeometry
+        this.model.traverse((child) => {
+            if (child.isMesh && child.geometry) {
+                const wasSanitized = sanitizeGeometry(child.geometry);
+                if (wasSanitized) {
+                    console.log(`ModelTester: Sanitized geometry for mesh in model from ${url}`);
+                }
+            }
+        });
+        
         this.scene.add(this.model);
 
         if (gltf.animations && gltf.animations.length > 0) {

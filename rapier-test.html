@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rapier API Test</title>
+    <style>
+        body { 
+            background: #000; 
+            color: #0f0; 
+            font-family: monospace; 
+            padding: 20px; 
+        }
+        #results { 
+            border: 1px solid #0f0; 
+            padding: 15px; 
+            margin: 20px 0; 
+            background: #001100; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Rapier Physics API Compatibility Test</h1>
+    <div id="results">Loading...</div>
+    
+    <script type="module">
+        const resultsDiv = document.getElementById('results');
+        
+        function log(message) {
+            resultsDiv.innerHTML += message + '<br>';
+            console.log(message);
+        }
+        
+        async function testRapierAPI() {
+            try {
+                log("=== Starting Rapier API Test ===");
+                
+                // Load Rapier
+                const RAPIER = await import('https://cdn.skypack.dev/@dimforge/rapier3d-compat');
+                await RAPIER.init();
+                
+                log("✓ Rapier loaded successfully");
+                
+                // Test RigidBodyDesc methods
+                const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic();
+                log("✓ RigidBodyDesc created");
+                
+                // Test available methods on RigidBodyDesc
+                log("RigidBodyDesc methods:");
+                log(`  - setMass: ${typeof rigidBodyDesc.setMass}`);
+                log(`  - mass: ${typeof rigidBodyDesc.mass}`);
+                log(`  - lockRotations: ${typeof rigidBodyDesc.lockRotations}`);
+                
+                // Test ColliderDesc methods
+                const colliderDesc = RAPIER.ColliderDesc.cuboid(1, 1, 1);
+                log("✓ ColliderDesc created");
+                
+                log("ColliderDesc methods:");
+                log(`  - setMass: ${typeof colliderDesc.setMass}`);
+                log(`  - setDensity: ${typeof colliderDesc.setDensity}`);
+                log(`  - mass: ${typeof colliderDesc.mass}`);
+                log(`  - density: ${typeof colliderDesc.density}`);
+                
+                // Test if setMass actually works
+                if (typeof colliderDesc.setMass === 'function') {
+                    try {
+                        colliderDesc.setMass(10);
+                        log("✓ colliderDesc.setMass(10) - SUCCESS");
+                    } catch (e) {
+                        log("✗ colliderDesc.setMass(10) - FAILED: " + e.message);
+                    }
+                }
+                
+                if (typeof colliderDesc.setDensity === 'function') {
+                    try {
+                        colliderDesc.setDensity(2.5);
+                        log("✓ colliderDesc.setDensity(2.5) - SUCCESS");
+                    } catch (e) {
+                        log("✗ colliderDesc.setDensity(2.5) - FAILED: " + e.message);
+                    }
+                }
+                
+                // Test World creation
+                const world = new RAPIER.World({ x: 0, y: 0, z: 0 });
+                log("✓ World created with zero gravity");
+                
+                log("World methods:");
+                log(`  - contactPairs: ${typeof world.contactPairs}`);
+                log(`  - contactsWith: ${typeof world.contactsWith}`);
+                log(`  - createRigidBody: ${typeof world.createRigidBody}`);
+                log(`  - createCollider: ${typeof world.createCollider}`);
+                
+                log("=== API Test Complete - All Good! ===");
+                
+            } catch (error) {
+                log("✗ API Test failed: " + error.message);
+                console.error("Full error:", error);
+            }
+        }
+        
+        testRapierAPI();
+    </script>
+</body>
+</html>

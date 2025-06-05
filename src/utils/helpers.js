@@ -1,4 +1,5 @@
 import * as THREE from '../../libs/three/three.module.js';
+import { sanitizeGeometry } from './math.js';
 
 /**
  * General utility functions for the game.
@@ -51,7 +52,18 @@ export function loadTexture(url) {
 export function loadModel(url, GLTFLoader) {
     return new Promise((resolve, reject) => {
         const loader = new GLTFLoader();
-        loader.load(url, resolve, undefined, reject);
+        loader.load(url, (gltf) => {
+            // Sanitize geometry to prevent NaN values in BufferGeometry
+            gltf.scene.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    const wasSanitized = sanitizeGeometry(child.geometry);
+                    if (wasSanitized) {
+                        console.log(`loadModel: Sanitized geometry for mesh in model from ${url}`);
+                    }
+                }
+            });
+            resolve(gltf);
+        }, undefined, reject);
     });
 }
 

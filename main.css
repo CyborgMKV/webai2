@@ -59,3 +59,32 @@ canvas {
 .button:hover {
     background-color: #666;
 }
+
+/* Controls instructions */
+.controls-info {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    max-width: 300px;
+}
+
+.pointer-lock-prompt {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    z-index: 100;
+}
+
+/* Hide cursor when pointer is locked */
+canvas:focus {
+    cursor: none;
+}

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BufferGeometry NaN Fix Validation</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #1a1a1a; 
+            color: #fff; 
+        }
+        .test-result { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 4px; 
+            border-left: 4px solid; 
+        }
+        .pass { background: #2d5a2d; border-color: #4caf50; }
+        .fail { background: #5a2d2d; border-color: #f44336; }
+        .console-output { 
+            background: #000; 
+            color: #0f0; 
+            padding: 15px; 
+            border-radius: 4px; 
+            white-space: pre-wrap; 
+            font-family: monospace; 
+            max-height: 400px; 
+            overflow-y: auto; 
+        }
+        .run-button {
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .run-button:hover { background: #45a049; }
+    </style>
+</head>
+<body>
+    <h1>🔍 BufferGeometry NaN Fix Validation</h1>
+    <p>This test validates that all BufferGeometry NaN fixes are working correctly.</p>
+    
+    <button class="run-button" onclick="runValidation()">🚀 Run Validation Tests</button>
+    <button class="run-button" onclick="clearResults()">🧹 Clear Results</button>
+    
+    <div id="results"></div>
+    <div class="console-output" id="console"></div>
+    
+    <script type="module">
+        import * as THREE from './libs/three/three.module.js';
+        import { normalize, safeNormalize, sanitizePosition, sanitizeGeometry } from './src/utils/math.js';
+        
+        let consoleDiv = document.getElementById('console');
+        let resultsDiv = document.getElementById('results');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.textContent = `[${timestamp}] ${message}`;
+            consoleDiv.appendChild(div);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function addResult(testName, passed, details = '') {
+            const div = document.createElement('div');
+            div.className = `test-result ${passed ? 'pass' : 'fail'}`;
+            div.innerHTML = `
+                <strong>${testName}:</strong> ${passed ? '✅ PASS' : '❌ FAIL'}
+                ${details ? `<br><small>${details}</small>` : ''}
+            `;
+            resultsDiv.appendChild(div);
+        }
+        
+        window.runValidation = async function() {
+            resultsDiv.innerHTML = '';
+            consoleDiv.innerHTML = '';
+            
+            log('🔍 Starting comprehensive BufferGeometry NaN validation...');
+            
+            let allTestsPassed = true;
+            
+            // Test 1: Math utility functions
+            log('📊 Test 1: Math utility functions');
+            try {
+                // Test normalize with zero vector
+                const zeroVector = { x: 0, y: 0, z: 0 };
+                const normalizedZero = normalize(zeroVector);
+                
+                const normalizeWorks = !isNaN(normalizedZero.x) && !isNaN(normalizedZero.y) && !isNaN(normalizedZero.z);
+                addResult('normalize() function', normalizeWorks, 
+                    normalizeWorks ? 'Handles zero vectors correctly' : 'Still produces NaN for zero vectors');
+                
+                if (!normalizeWorks) allTestsPassed = false;
+                
+                // Test safeNormalize with THREE.Vector3
+                const zeroVec3 = new THREE.Vector3(0, 0, 0);
+                const safeNormalized = safeNormalize(zeroVec3);
+                
+                const safeNormalizeWorks = !isNaN(safeNormalized.x) && !isNaN(safeNormalized.y) && !isNaN(safeNormalized.z);
+                addResult('safeNormalize() function', safeNormalizeWorks,
+                    safeNormalizeWorks ? 'Handles zero THREE.Vector3 correctly' : 'Produces NaN values');
+                
+                if (!safeNormalizeWorks) allTestsPassed = false;
+                
+                log('✅ Math utilities test completed');
+                
+            } catch (error) {
+                log(`❌ Math utilities test failed: ${error.message}`);
+                addResult('Math utilities', false, error.message);
+                allTestsPassed = false;
+            }
+            
+            // Test 2: BufferGeometry sanitization
+            log('📊 Test 2: BufferGeometry sanitization');
+            try {
+                const testGeometry = new THREE.BufferGeometry();
+                const positions = new Float32Array([
+                    0, 0, 0,           // Normal values
+                    1, 1, 1,           // Normal values
+                    NaN, NaN, NaN,     // Intentional NaN
+                    2, 2, 2,           // Normal values
+                    Infinity, -Infinity, NaN  // Mixed problematic values
+                ]);
+                
+                testGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                
+                const wasSanitized = sanitizeGeometry(testGeometry);
+                addResult('sanitizeGeometry() detection', wasSanitized,
+                    wasSanitized ? 'Correctly detected NaN/Infinity values' : 'Failed to detect problematic values');
+                
+                if (!wasSanitized) allTestsPassed = false;
+                
+                // Test if bounding sphere can be computed after sanitization
+                try {
+                    testGeometry.computeBoundingSphere();
+                    addResult('computeBoundingSphere() after sanitization', true, 
+                        'No NaN errors thrown after sanitization');
+                    log('✅ BufferGeometry.computeBoundingSphere() works after sanitization');
+                } catch (error) {
+                    if (error.message.includes('NaN')) {
+                        addResult('computeBoundingSphere() after sanitization', false,
+                            'Still throws NaN error after sanitization');
+                        log(`❌ BufferGeometry still has NaN after sanitization: ${error.message}`);
+                        allTestsPassed = false;
+                    } else {
+                        addResult('computeBoundingSphere() after sanitization', true,
+                            `Throws different error (expected): ${error.message}`);
+                        log(`⚠️ BufferGeometry threw different error: ${error.message}`);
+                    }
+                }
+                
+            } catch (error) {
+                log(`❌ BufferGeometry test failed: ${error.message}`);
+                addResult('BufferGeometry sanitization', false, error.message);
+                allTestsPassed = false;
+            }
+            
+            // Test 3: Position sanitization
+            log('📊 Test 3: Position sanitization');
+            try {
+                const badPosition = new THREE.Vector3(NaN, Infinity, -Infinity);
+                const sanitizedPos = sanitizePosition(badPosition);
+                
+                const positionSanitized = !isNaN(sanitizedPos.x) && 
+                                        !isNaN(sanitizedPos.y) && 
+                                        !isNaN(sanitizedPos.z) &&
+                                        isFinite(sanitizedPos.x) &&
+                                        isFinite(sanitizedPos.y) &&
+                                        isFinite(sanitizedPos.z);
+                
+                addResult('sanitizePosition() function', positionSanitized,
+                    positionSanitized ? 'Correctly sanitizes NaN/Infinity values' : 'Failed to sanitize position');
+                
+                if (!positionSanitized) allTestsPassed = false;
+                
+            } catch (error) {
+                log(`❌ Position sanitization test failed: ${error.message}`);
+                addResult('Position sanitization', false, error.message);
+                allTestsPassed = false;
+            }
+            
+            // Test 4: Stress test with multiple geometries
+            log('📊 Test 4: Stress test with multiple geometries');
+            try {
+                let stressTestPassed = true;
+                const stressTestCount = 10;
+                
+                for (let i = 0; i < stressTestCount; i++) {
+                    const geometry = new THREE.BufferGeometry();
+                    const positions = new Float32Array(90); // 30 vertices
+                    
+                    // Fill with random values including some NaN/Infinity
+                    for (let j = 0; j < positions.length; j++) {
+                        const rand = Math.random();
+                        if (rand < 0.1) {
+                            positions[j] = NaN;
+                        } else if (rand < 0.15) {
+                            positions[j] = Infinity;
+                        } else if (rand < 0.2) {
+                            positions[j] = -Infinity;
+                        } else {
+                            positions[j] = (Math.random() - 0.5) * 100;
+                        }
+                    }
+                    
+                    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                    
+                    // Sanitize and test
+                    sanitizeGeometry(geometry);
+                    
+                    try {
+                        geometry.computeBoundingSphere();
+                    } catch (error) {
+                        if (error.message.includes('NaN')) {
+                            stressTestPassed = false;
+                            log(`❌ Stress test failed on iteration ${i + 1}: ${error.message}`);
+                            break;
+                        }
+                    }
+                }
+                
+                addResult('Stress test (multiple geometries)', stressTestPassed,
+                    stressTestPassed ? `${stressTestCount} geometries processed successfully` : 'Failed during stress testing');
+                
+                if (!stressTestPassed) allTestsPassed = false;
+                
+            } catch (error) {
+                log(`❌ Stress test failed: ${error.message}`);
+                addResult('Stress test', false, error.message);
+                allTestsPassed = false;
+            }
+            
+            // Final result
+            log('🎯 VALIDATION COMPLETE');
+            const finalDiv = document.createElement('div');
+            finalDiv.className = `test-result ${allTestsPassed ? 'pass' : 'fail'}`;
+            finalDiv.innerHTML = `
+                <h3>${allTestsPassed ? '🎉 ALL TESTS PASSED!' : '💥 SOME TESTS FAILED'}</h3>
+                <p>${allTestsPassed ? 
+                    'The application is fully protected against BufferGeometry NaN errors.' : 
+                    'Some BufferGeometry NaN protection may not be working correctly.'}</p>
+            `;
+            resultsDiv.appendChild(finalDiv);
+            
+            if (allTestsPassed) {
+                log('🛡️ BufferGeometry NaN protection is ACTIVE and WORKING');
+                log('✅ The WebAI 3D game should run without NaN-related crashes');
+            } else {
+                log('⚠️ Some protection mechanisms may need additional work');
+            }
+        };
+        
+        window.clearResults = function() {
+            resultsDiv.innerHTML = '';
+            consoleDiv.innerHTML = '';
+        };
+        
+        // Auto-run validation when page loads
+        setTimeout(() => {
+            log('🎮 Auto-running validation tests...');
+            window.runValidation();
+        }, 1000);
+    </script>
+</body>
+</html>

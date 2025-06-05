@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive NaN Fix Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #111;
+            color: #fff;
+            font-family: monospace;
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        #canvas-container {
+            width: 800px;
+            height: 600px;
+            border: 2px solid #444;
+            position: relative;
+        }
+        #log {
+            background: #222;
+            padding: 10px;
+            border-radius: 5px;
+            height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .test-info {
+            background: #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196F3; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div class="test-info">
+            <h2>Comprehensive BufferGeometry NaN Fix Test</h2>
+            <p>This test validates that all GLTF model loading locations properly sanitize geometry to prevent NaN values.</p>
+            <p>Status: <span id="status">Starting tests...</span></p>
+        </div>
+        
+        <div id="canvas-container"></div>
+        
+        <div>
+            <h3>Test Log:</h3>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from './libs/three/three.module.js';
+        import { GLTFLoader } from './libs/three/loaders/GLTFLoader.js';
+        import { DRACOLoader } from './libs/three/loaders/DRACOLoader.js';
+        import { sanitizeGeometry } from './src/utils/math.js';
+        import { loadModel } from './src/utils/helpers.js';
+        import ModelTester from './src/tools/modelTester.js';
+        import Shark from './src/game/shark.js';
+        import FlyingRobot from './src/game/flyingRobot.js';
+        import Weapon from './src/game/weapon.js';
+
+        // Test logging
+        const logElement = document.getElementById('log');
+        const statusElement = document.getElementById('status');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logElement.appendChild(logEntry);
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        // Setup basic Three.js scene
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, 800/600, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(800, 600);
+        renderer.setClearColor(0x111111);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+        
+        camera.position.set(0, 5, 10);
+        camera.lookAt(0, 0, 0);
+
+        // Add lights
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 10, 5);
+        scene.add(directionalLight);
+
+        // Track original console methods to catch errors
+        const originalError = console.error;
+        let errorCount = 0;
+        let nanErrors = 0;
+        
+        console.error = function(...args) {
+            const message = args.join(' ');
+            if (message.includes('BufferGeometry') && message.includes('NaN')) {
+                nanErrors++;
+                log(`CAUGHT NaN ERROR: ${message}`, 'error');
+            } else {
+                errorCount++;
+                log(`Error: ${message}`, 'error');
+            }
+            originalError.apply(console, args);
+        };
+
+        // Test functions
+        async function testHelperFunction() {
+            log('Testing helpers.js loadModel function...', 'info');
+            try {
+                const gltf = await loadModel('./assets/models/shark.glb', GLTFLoader);
+                log('✓ helpers.js loadModel completed successfully', 'success');
+                scene.add(gltf.scene);
+                gltf.scene.position.set(-5, 0, 0);
+                return true;
+            } catch (error) {
+                log(`✗ helpers.js loadModel failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testModelTester() {
+            log('Testing ModelTester class...', 'info');
+            try {
+                const tester = new ModelTester();
+                await tester.loadModel('./assets/models/flyingRobot.glb');
+                log('✓ ModelTester loadModel completed successfully', 'success');
+                
+                if (tester.model) {
+                    scene.add(tester.model);
+                    tester.model.position.set(5, 0, 0);
+                }
+                return true;
+            } catch (error) {
+                log(`✗ ModelTester failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testSharkEntity() {
+            log('Testing Shark entity model loading...', 'info');
+            try {
+                const shark = new Shark('TestShark', scene, { x: 0, y: -2, z: 0 });
+                await new Promise((resolve) => {
+                    shark.onModelLoaded = resolve;
+                });
+                log('✓ Shark entity loaded successfully', 'success');
+                return true;
+            } catch (error) {
+                log(`✗ Shark entity failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testFlyingRobotEntity() {
+            log('Testing FlyingRobot entity model loading...', 'info');
+            try {
+                const robot = new FlyingRobot('TestRobot', scene, { x: 0, y: 2, z: 0 });
+                await new Promise((resolve) => {
+                    robot.onModelLoaded = resolve;
+                });
+                log('✓ FlyingRobot entity loaded successfully', 'success');
+                return true;
+            } catch (error) {
+                log(`✗ FlyingRobot entity failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testWeaponLoading() {
+            log('Testing Weapon model loading...', 'info');
+            try {
+                // Load weapon config first
+                await Weapon.loadGlobalConfig();
+                const weapon = new Weapon(scene, 'pistol', null);
+                
+                // Wait a bit for weapon model to load
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                log('✓ Weapon loading completed successfully', 'success');
+                return true;
+            } catch (error) {
+                log(`✗ Weapon loading failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testDirectGLTFLoading() {
+            log('Testing direct GLTFLoader with sanitization...', 'info');
+            try {
+                const loader = new GLTFLoader();
+                const dracoLoader = new DRACOLoader();
+                dracoLoader.setDecoderPath('./libs/three/draco/gltf/');
+                loader.setDRACOLoader(dracoLoader);
+
+                const gltf = await new Promise((resolve, reject) => {
+                    loader.load('./assets/models/uzi.glb', resolve, undefined, reject);
+                });
+
+                // Manually sanitize
+                gltf.scene.traverse((child) => {
+                    if (child.isMesh && child.geometry) {
+                        const wasSanitized = sanitizeGeometry(child.geometry);
+                        if (wasSanitized) {
+                            log('Sanitized geometry in direct GLTF loading', 'info');
+                        }
+                    }
+                });
+
+                scene.add(gltf.scene);
+                gltf.scene.position.set(0, 0, 3);
+                gltf.scene.scale.setScalar(0.5);
+                
+                log('✓ Direct GLTF loading completed successfully', 'success');
+                return true;
+            } catch (error) {
+                log(`✗ Direct GLTF loading failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+        // Run all tests
+        async function runComprehensiveTests() {
+            log('=== Starting Comprehensive NaN Fix Tests ===', 'info');
+            statusElement.textContent = 'Running tests...';
+
+            const tests = [
+                { name: 'Helper Function', test: testHelperFunction },
+                { name: 'ModelTester', test: testModelTester },
+                { name: 'Shark Entity', test: testSharkEntity },
+                { name: 'FlyingRobot Entity', test: testFlyingRobotEntity },
+                { name: 'Weapon Loading', test: testWeaponLoading },
+                { name: 'Direct GLTF Loading', test: testDirectGLTFLoading }
+            ];
+
+            let passed = 0;
+            let failed = 0;
+
+            for (const { name, test } of tests) {
+                log(`\n--- Testing ${name} ---`, 'info');
+                try {
+                    const result = await test();
+                    if (result) {
+                        passed++;
+                    } else {
+                        failed++;
+                    }
+                } catch (error) {
+                    log(`Test ${name} threw error: ${error.message}`, 'error');
+                    failed++;
+                }
+                
+                // Brief pause between tests
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            // Final report
+            log('\n=== TEST RESULTS ===', 'info');
+            log(`Tests Passed: ${passed}`, 'success');
+            log(`Tests Failed: ${failed}`, failed > 0 ? 'error' : 'info');
+            log(`NaN Errors Detected: ${nanErrors}`, nanErrors > 0 ? 'error' : 'success');
+            log(`Other Errors: ${errorCount}`, errorCount > 0 ? 'warning' : 'info');
+            
+            if (nanErrors === 0 && failed === 0) {
+                statusElement.textContent = '✓ All tests passed! NaN errors eliminated.';
+                statusElement.className = 'success';
+                log('🎉 SUCCESS: All BufferGeometry NaN errors have been eliminated!', 'success');
+            } else {
+                statusElement.textContent = `❌ ${failed} tests failed, ${nanErrors} NaN errors detected`;
+                statusElement.className = 'error';
+            }
+        }
+
+        // Start tests after a brief delay
+        animate();
+        setTimeout(runComprehensiveTests, 1000);
+    </script>
+</body>
+</html>

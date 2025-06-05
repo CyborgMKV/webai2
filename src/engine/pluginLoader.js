@@ -27,11 +27,36 @@ export default class PluginLoader {
                     this.game.spawnHeart(entityConfig); // Assuming Game class has spawnHeart
                 } else if (entityConfig.type === 'shark') {
                     console.log('PluginLoader: Attempting to spawn Shark with config:', entityConfig);
+
+                    // Prepare options for the Shark constructor by spreading entityConfig 
+                    // and then specifically adding health and points from sharkStats.
+                    const sharkOptions = { ...entityConfig }; 
+
+                    if (entityConfig.sharkStats) {
+                        if (typeof entityConfig.sharkStats.health === 'number') {
+                            sharkOptions.health = entityConfig.sharkStats.health;
+                        }
+                        if (typeof entityConfig.sharkStats.points === 'number') {
+                            sharkOptions.points = entityConfig.sharkStats.points;
+                        }
+                        // Optionally, delete sharkOptions.sharkStats if you want to keep the final options object clean,
+                        // though it's not strictly necessary for functionality.
+                        // delete sharkOptions.sharkStats; 
+                    }
+
                     // The Shark constructor takes 'game' as the first argument, then 'options'
-                    const shark = new Shark(this.game, entityConfig); 
+                    const shark = new Shark(this.game, sharkOptions); 
                     this.game.addEntity(shark); // Add shark to game's entity list
                     // The Shark class itself handles adding its mesh to the scene in its loadModel method.
-                    console.log(`PluginLoader: Shark entity '${entityConfig.name || 'Unnamed Shark'}' created and added to game.`);
+                    // Update log to show health if available in sharkOptions
+                    let logMessage = `PluginLoader: Shark entity '${sharkOptions.name || 'Unnamed Shark'}' created and added to game.`;
+                    if (typeof sharkOptions.health === 'number') {
+                        logMessage += ` Health: ${sharkOptions.health}.`;
+                    }
+                     if (typeof sharkOptions.points === 'number') {
+                        logMessage += ` Points: ${sharkOptions.points}.`;
+                    }
+                    console.log(logMessage);
                 } else {
                     console.warn(`PluginLoader: Unknown entity type '${entityConfig.type}' in plugin '${plugin.name}'.`);
                 }

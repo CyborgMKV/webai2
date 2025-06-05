@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Physics Fixes Test - WebAI 3D</title>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 20px; 
+            font-family: Arial, sans-serif; 
+            background: #181822; 
+            color: white; 
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 5px solid;
+        }
+        .test-pass { 
+            background: #1a4a1a; 
+            border-color: #4caf50; 
+        }
+        .test-fail { 
+            background: #4a1a1a; 
+            border-color: #f44336; 
+        }
+        .test-info { 
+            background: #1a1a4a; 
+            border-color: #2196f3; 
+        }
+        #console-output {
+            background: #000;
+            padding: 15px;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        button {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #game-container {
+            width: 100%;
+            height: 400px;
+            border: 2px solid #333;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Physics Fixes Verification Test</h1>
+        <p>This page tests the flyingRobot physics fixes we implemented.</p>
+        
+        <div id="test-results"></div>
+        
+        <h3>Console Output:</h3>
+        <div id="console-output"></div>
+        
+        <button onclick="runPhysicsTest()">Run Physics Test</button>
+        <button onclick="clearConsole()">Clear Console</button>
+        <button onclick="loadMainGame()">Load Main Game</button>
+        
+        <div id="game-container"></div>
+    </div>
+
+    <script type="module">
+        // Capture console output
+        const consoleOutput = document.getElementById('console-output');
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        function addToConsole(type, ...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = `[${timestamp}] ${type.toUpperCase()}: ${args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ')}\n`;
+            consoleOutput.textContent += message;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        console.log = (...args) => {
+            originalLog.apply(console, args);
+            addToConsole('log', ...args);
+        };
+        
+        console.error = (...args) => {
+            originalError.apply(console, args);
+            addToConsole('error', ...args);
+        };
+        
+        console.warn = (...args) => {
+            originalWarn.apply(console, args);
+            addToConsole('warn', ...args);
+        };
+        
+        // Global functions for buttons
+        window.clearConsole = () => {
+            consoleOutput.textContent = '';
+        };
+        
+        window.runPhysicsTest = async () => {
+            console.log('Starting Physics Fixes Test...');
+            
+            try {
+                // Test 1: Load flyingRobot.js and check for fixes
+                console.log('Test 1: Checking flyingRobot.js fixes...');
+                const robotResponse = await fetch('./src/game/flyingRobot.js');
+                const robotCode = await robotResponse.text();
+                
+                const hasReducedAIForce = robotCode.includes('* 2') && !robotCode.includes('* 10');
+                const hasProperPhysicsSync = robotCode.includes('this.mesh.position.copy(this.physics.rigidBody.translation())');
+                
+                addTestResult('flyingRobot AI Force Multiplier Reduced', hasReducedAIForce);
+                addTestResult('flyingRobot Physics Position Sync', hasProperPhysicsSync);
+                
+                // Test 2: Load input.js and check for fixes
+                console.log('Test 2: Checking InputComponent fixes...');
+                const inputResponse = await fetch('./src/components/input.js');
+                const inputCode = await inputResponse.text();
+                
+                const hasReducedInputForce = inputCode.includes('* 20') && !inputCode.includes('* 50');
+                const hasImprovedDamping = inputCode.includes('0.85') && !inputCode.includes('0.9');
+                
+                addTestResult('InputComponent Force Reduced', hasReducedInputForce);
+                addTestResult('InputComponent Damping Improved', hasImprovedDamping);
+                
+                // Test 3: Try to load the main app
+                console.log('Test 3: Testing main app initialization...');
+                const App = (await import('./src/app.js')).default;
+                
+                // Create a minimal test instance
+                const testContainer = document.getElementById('game-container');
+                testContainer.innerHTML = '';
+                
+                try {
+                    const testApp = new App(testContainer);
+                    addTestResult('Main App Creates Successfully', true);
+                    console.log('App created successfully for testing');
+                    
+                    // Wait a bit for initialization
+                    setTimeout(() => {
+                        if (testApp.game && testApp.game.physicsManager) {
+                            addTestResult('Physics Manager Initialized', testApp.game.physicsManager.initialized);
+                            console.log('Physics Manager Status:', {
+                                initialized: testApp.game.physicsManager.initialized,
+                                rigidBodies: testApp.game.physicsManager.rigidBodies?.size || 0
+                            });
+                        }
+                    }, 2000);
+                    
+                } catch (appError) {
+                    addTestResult('Main App Creates Successfully', false);
+                    console.error('App creation failed:', appError);
+                }
+                
+                console.log('Physics fixes test completed!');
+                
+            } catch (error) {
+                console.error('Test failed:', error);
+                addTestResult('Test Execution', false);
+            }
+        };
+        
+        window.loadMainGame = () => {
+            window.open('./index.html', '_blank');
+        };
+        
+        function addTestResult(testName, passed) {
+            const resultsDiv = document.getElementById('test-results');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `test-status ${passed ? 'test-pass' : 'test-fail'}`;
+            statusDiv.innerHTML = `<strong>${testName}:</strong> ${passed ? 'PASS ✓' : 'FAIL ✗'}`;
+            resultsDiv.appendChild(statusDiv);
+        }
+        
+        // Auto-run test when page loads
+        console.log('Physics test page loaded. Ready to run tests.');
+    </script>
+</body>
+</html>

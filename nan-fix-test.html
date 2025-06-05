@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NaN Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .pass { background-color: #2d5a2d; }
+        .fail { background-color: #5a2d2d; }
+        .info { background-color: #2d2d5a; }
+        pre {
+            background-color: #333;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>THREE.js BufferGeometry NaN Fix Test</h1>
+    <div id="results"></div>
+    
+    <script type="module">
+        import * as THREE from './libs/three/three.module.js';
+        import { normalize, magnitude, safeNormalize, sanitizePosition } from './src/utils/math.js';
+        
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+        
+        function testVector(name, vector) {
+            const hasNaN = !isFinite(vector.x) || !isFinite(vector.y) || !isFinite(vector.z);
+            return { name, vector, hasNaN };
+        }
+        
+        addResult('<h2>Testing Math Utility Functions</h2>');
+        
+        // Test 1: Original normalize function with zero vector
+        try {
+            const zeroVector = { x: 0, y: 0, z: 0 };
+            const normalized = normalize(zeroVector);
+            const test = testVector('Normalized zero vector', normalized);
+            
+            if (test.hasNaN) {
+                addResult(`❌ FAIL: normalize() still produces NaN: ${JSON.stringify(normalized)}`, 'fail');
+            } else {
+                addResult(`✅ PASS: normalize() handles zero vector safely: ${JSON.stringify(normalized)}`, 'pass');
+            }
+        } catch (error) {
+            addResult(`❌ ERROR: normalize() threw error: ${error.message}`, 'fail');
+        }
+        
+        // Test 2: THREE.js Vector3 safeNormalize function
+        try {
+            const zeroVec3 = new THREE.Vector3(0, 0, 0);
+            const safeNormalized = safeNormalize(zeroVec3);
+            const test = testVector('Safe normalized zero Vector3', safeNormalized);
+            
+            if (test.hasNaN) {
+                addResult(`❌ FAIL: safeNormalize() produces NaN: ${JSON.stringify(safeNormalized)}`, 'fail');
+            } else {
+                addResult(`✅ PASS: safeNormalize() handles zero Vector3 safely: ${JSON.stringify(safeNormalized)}`, 'pass');
+            }
+        } catch (error) {
+            addResult(`❌ ERROR: safeNormalize() threw error: ${error.message}`, 'fail');
+        }
+        
+        // Test 3: Position sanitization
+        try {
+            const nanPosition = new THREE.Vector3(NaN, 5, Infinity);
+            const sanitized = sanitizePosition(nanPosition);
+            const test = testVector('Sanitized position', sanitized);
+            
+            if (test.hasNaN) {
+                addResult(`❌ FAIL: sanitizePosition() still has NaN: ${JSON.stringify(sanitized)}`, 'fail');
+            } else {
+                addResult(`✅ PASS: sanitizePosition() cleaned invalid values: ${JSON.stringify(sanitized)}`, 'pass');
+            }
+        } catch (error) {
+            addResult(`❌ ERROR: sanitizePosition() threw error: ${error.message}`, 'fail');
+        }
+        
+        // Test 4: BufferGeometry with valid vectors
+        addResult('<h2>Testing THREE.js BufferGeometry</h2>');
+        
+        try {
+            const geometry = new THREE.BufferGeometry();
+            const validPositions = new Float32Array([
+                0, 0, 0,
+                1, 0, 0,
+                0, 1, 0
+            ]);
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(validPositions, 3));
+            geometry.computeBoundingSphere();
+            
+            if (isFinite(geometry.boundingSphere.radius)) {
+                addResult(`✅ PASS: BufferGeometry bounding sphere computed successfully: radius = ${geometry.boundingSphere.radius}`, 'pass');
+            } else {
+                addResult(`❌ FAIL: BufferGeometry bounding sphere radius is invalid: ${geometry.boundingSphere.radius}`, 'fail');
+            }
+        } catch (error) {
+            addResult(`❌ ERROR: BufferGeometry test threw error: ${error.message}`, 'fail');
+        }
+        
+        // Test 5: BufferGeometry with NaN positions (should fail gracefully)
+        try {
+            const geometry = new THREE.BufferGeometry();
+            const nanPositions = new Float32Array([
+                0, 0, 0,
+                NaN, 0, 0,
+                0, 1, 0
+            ]);
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(nanPositions, 3));
+            geometry.computeBoundingSphere();
+            
+            if (isFinite(geometry.boundingSphere.radius)) {
+                addResult(`⚠️ UNEXPECTED: BufferGeometry handled NaN positions: radius = ${geometry.boundingSphere.radius}`, 'info');
+            } else {
+                addResult(`❌ EXPECTED: BufferGeometry fails with NaN positions: radius = ${geometry.boundingSphere.radius}`, 'info');
+            }
+        } catch (error) {
+            addResult(`❌ EXPECTED: BufferGeometry with NaN threw error: ${error.message}`, 'info');
+        }
+        
+        addResult('<h2>Test Summary</h2>');
+        addResult('If all tests pass, the NaN fix should prevent BufferGeometry bounding sphere calculation errors.', 'info');
+        
+        // Console log for debugging
+        console.log('NaN fix test completed. Check the page for results.');
+    </script>
+</body>
+</html>

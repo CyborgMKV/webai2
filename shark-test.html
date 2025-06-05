@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Shark Entity Test</title>
+    <style>
+        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; background: #181822; color: white; }
+        #console { background: #333; padding: 10px; margin: 10px 0; height: 400px; overflow-y: auto; border: 1px solid #555; }
+        #game-container { width: 100%; height: 400px; border: 1px solid #555; }
+        button { padding: 10px; margin: 5px; background: #4caf50; color: white; border: none; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #555; }
+    </style>
+</head>
+<body>
+    <h1>Shark Entity Test</h1>
+    
+    <div class="test-section">
+        <h3>Test Controls</h3>
+        <button onclick="testSharkImport()">Test Shark Import</button>
+        <button onclick="testSharkCreation()">Test Shark Creation</button>
+        <button onclick="testSharkPhysics()">Test Shark Physics</button>
+        <button onclick="testSharkGeometry()">Test Shark Geometry</button>
+        <button onclick="clearConsole()">Clear Console</button>
+    </div>
+
+    <div id="console"></div>
+    <div id="game-container"></div>
+
+    <script type="module">
+        // Console capture
+        const consoleDiv = document.getElementById('console');
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        function logToDiv(level, args) {
+            const message = args.map(arg => {
+                if (typeof arg === 'object') {
+                    if (arg instanceof Error) {
+                        return `${arg.name}: ${arg.message}\n${arg.stack}`;
+                    }
+                    return JSON.stringify(arg, null, 2);
+                }
+                return String(arg);
+            }).join(' ');
+            
+            const div = document.createElement('div');
+            div.style.color = level === 'error' ? '#ff4444' : level === 'warn' ? '#ffaa44' : '#44ff44';
+            div.style.whiteSpace = 'pre-wrap';
+            div.textContent = `[${level.toUpperCase()}] ${new Date().toLocaleTimeString()}: ${message}`;
+            consoleDiv.appendChild(div);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            logToDiv('log', args);
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            logToDiv('error', args);
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            logToDiv('warn', args);
+        };
+
+        window.clearConsole = function() {
+            consoleDiv.innerHTML = '';
+        };
+
+        // Test functions
+        window.testSharkImport = async function() {
+            console.log('=== Testing Shark Import ===');
+            try {
+                console.log('Importing THREE.js...');
+                const THREE = await import('./libs/three/three.module.js');
+                console.log('THREE.js imported successfully');
+
+                console.log('Importing Entity...');
+                const EntityModule = await import('./src/engine/entity.js');
+                console.log('Entity imported successfully');
+
+                console.log('Importing PhysicsComponent...');
+                const PhysicsModule = await import('./src/components/physics.js');
+                console.log('PhysicsComponent imported successfully');
+
+                console.log('Importing Shark...');
+                const SharkModule = await import('./src/game/shark.js');
+                console.log('Shark imported successfully:', !!SharkModule.default);
+
+                window.SharkClass = SharkModule.default;
+                console.log('Shark class available for testing');
+
+            } catch (error) {
+                console.error('Error during Shark import:', error);
+            }
+        };
+
+        window.testSharkCreation = async function() {
+            console.log('=== Testing Shark Creation ===');
+            try {
+                if (!window.SharkClass) {
+                    console.log('Shark class not available, importing first...');
+                    await testSharkImport();
+                }
+
+                console.log('Creating Shark instance...');
+                const shark = new window.SharkClass({ x: 0, y: 0, z: 0 });
+                console.log('Shark instance created:', !!shark);
+                console.log('Shark position:', shark.position);
+                console.log('Shark type:', shark.type);
+                console.log('Shark components:', Object.keys(shark.components));
+
+                window.testShark = shark;
+                console.log('Shark available as window.testShark');
+
+            } catch (error) {
+                console.error('Error during Shark creation:', error);
+            }
+        };
+
+        window.testSharkPhysics = async function() {
+            console.log('=== Testing Shark Physics ===');
+            try {
+                if (!window.testShark) {
+                    console.log('Test shark not available, creating first...');
+                    await testSharkCreation();
+                }
+
+                const shark = window.testShark;
+                const physicsComponent = shark.getComponent('physics');
+                
+                if (physicsComponent) {
+                    console.log('Physics component found:', !!physicsComponent);
+                    console.log('Physics component type:', physicsComponent.constructor.name);
+                    console.log('Physics component properties:', Object.keys(physicsComponent));
+                } else {
+                    console.warn('No physics component found on shark');
+                }
+
+                // Test for NaN values in position
+                const pos = shark.position;
+                console.log('Position values:', { x: pos.x, y: pos.y, z: pos.z });
+                
+                const hasNaN = isNaN(pos.x) || isNaN(pos.y) || isNaN(pos.z);
+                if (hasNaN) {
+                    console.error('NaN detected in shark position!');
+                } else {
+                    console.log('No NaN values in shark position');
+                }
+
+            } catch (error) {
+                console.error('Error during Shark physics test:', error);
+            }
+        };
+
+        window.testSharkGeometry = async function() {
+            console.log('=== Testing Shark Geometry ===');
+            try {
+                if (!window.testShark) {
+                    console.log('Test shark not available, creating first...');
+                    await testSharkCreation();
+                }
+
+                const shark = window.testShark;
+                
+                // Check for mesh and geometry
+                if (shark.mesh) {
+                    console.log('Shark mesh found:', !!shark.mesh);
+                    console.log('Mesh position:', shark.mesh.position);
+                    console.log('Mesh scale:', shark.mesh.scale);
+                    console.log('Mesh rotation:', shark.mesh.rotation);
+                    
+                    // Check for geometry
+                    if (shark.mesh.geometry) {
+                        console.log('Geometry found:', shark.mesh.geometry.type);
+                        console.log('Vertex count:', shark.mesh.geometry.attributes.position?.count || 'unknown');
+                    } else {
+                        console.warn('No geometry found on shark mesh');
+                    }
+                } else {
+                    console.warn('No mesh found on shark');
+                }
+
+                // Check hitbox helpers
+                if (shark.debugHitboxHelpers && shark.debugHitboxHelpers.length > 0) {
+                    console.log('Debug hitbox helpers found:', shark.debugHitboxHelpers.length);
+                    shark.debugHitboxHelpers.forEach((helper, index) => {
+                        console.log(`Hitbox helper ${index}:`, helper.constructor.name);
+                    });
+                } else {
+                    console.log('No debug hitbox helpers found');
+                }
+
+            } catch (error) {
+                console.error('Error during Shark geometry test:', error);
+            }
+        };
+
+        // Error handling
+        window.addEventListener('error', (e) => {
+            console.error('Unhandled error:', e.error);
+        });
+
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('Unhandled promise rejection:', e.reason);
+        });
+
+        console.log('Shark Entity Test page loaded. Use the buttons to run tests.');
+    </script>
+</body>
+</html>

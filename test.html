@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebAI 3D Test</title>
+</head>
+<body>
+    <h1>WebAI 3D Game Test</h1>
+    <div id="status">Loading...</div>
+    <script type="module">
+        console.log('Test page loaded');
+        document.getElementById('status').innerHTML = 'Test page working!';
+        
+        // Test importing our main app
+        try {
+            const { default: App } = await import('./src/app.js');
+            console.log('App import successful');
+            document.getElementById('status').innerHTML += '<br>App import successful!';
+        } catch (error) {
+            console.error('App import failed:', error);
+            document.getElementById('status').innerHTML += '<br>App import failed: ' + error.message;
+        }
+    </script>
+</body>
+</html>

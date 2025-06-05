@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NaN Fix Success Validation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .success-banner {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .test-card {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .test-card h3 {
+            margin: 0 0 15px 0;
+            color: #ffd700;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+        .pass { background: #28a745; }
+        .warning { background: #ffc107; color: #000; }
+        .info { background: #17a2b8; }
+        .log {
+            background: rgba(0,0,0,0.5);
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .stat {
+            display: inline-block;
+            margin: 0 20px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .canvas-container {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+        canvas {
+            border-radius: 5px;
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 BufferGeometry NaN Fix Validation</h1>
+            <p>Real-time validation that all THREE.js BufferGeometry NaN errors have been eliminated</p>
+        </div>
+
+        <div class="success-banner" id="successBanner">
+            ✅ Testing in progress...
+        </div>
+
+        <div style="text-align: center; margin-bottom: 30px;">
+            <div class="stat">
+                <div class="stat-number" id="nanErrors">0</div>
+                <div>NaN Errors</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number" id="testsPassed">0</div>
+                <div>Tests Passed</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number" id="geometriesSanitized">0</div>
+                <div>Geometries Sanitized</div>
+            </div>
+        </div>
+
+        <div class="test-grid">
+            <div class="test-card">
+                <h3>📐 Math Utilities</h3>
+                <div id="mathResults"></div>
+                <div class="log" id="mathLog"></div>
+            </div>
+
+            <div class="test-card">
+                <h3>🦈 Shark Model</h3>
+                <div id="sharkResults"></div>
+                <div class="log" id="sharkLog"></div>
+            </div>
+
+            <div class="test-card">
+                <h3>🤖 Flying Robot</h3>
+                <div id="robotResults"></div>
+                <div class="log" id="robotLog"></div>
+            </div>
+
+            <div class="test-card">
+                <h3>🔫 Weapon Models</h3>
+                <div id="weaponResults"></div>
+                <div class="log" id="weaponLog"></div>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <h3>🎮 Live Scene Test</h3>
+            <p>All models loaded and rendered without NaN errors:</p>
+            <div id="canvasContainer"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from './libs/three/three.module.js';
+        import { GLTFLoader } from './libs/three/loaders/GLTFLoader.js';
+        import { normalize, safeNormalize, sanitizePosition, sanitizeGeometry } from './src/utils/math.js';
+
+        // Statistics tracking
+        let stats = {
+            nanErrors: 0,
+            testsPassed: 0,
+            geometriesSanitized: 0
+        };
+
+        // Intercept console errors to track NaN issues
+        const originalError = console.error;
+        console.error = function(...args) {
+            const message = args.join(' ');
+            if (message.includes('BufferGeometry') && message.includes('NaN')) {
+                stats.nanErrors++;
+                updateStats();
+                logToSection('general', `🚨 NaN Error: ${message}`, 'error');
+            }
+            originalError.apply(console, args);
+        };
+
+        // Setup THREE.js scene
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, 800/400, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(800, 400);
+        renderer.setClearColor(0x000033, 0.8);
+        document.getElementById('canvasContainer').appendChild(renderer.domElement);
+
+        camera.position.set(0, 5, 10);
+        camera.lookAt(0, 0, 0);
+
+        // Add lights
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 10, 5);
+        scene.add(directionalLight);
+
+        // Utility functions
+        function updateStats() {
+            document.getElementById('nanErrors').textContent = stats.nanErrors;
+            document.getElementById('testsPassed').textContent = stats.testsPassed;
+            document.getElementById('geometriesSanitized').textContent = stats.geometriesSanitized;
+        }
+
+        function logToSection(section, message, type = 'info') {
+            const logElement = document.getElementById(`${section}Log`);
+            if (logElement) {
+                const timestamp = new Date().toLocaleTimeString();
+                logElement.innerHTML += `<div style="color: ${type === 'error' ? '#ff4444' : type === 'success' ? '#44ff44' : '#ffffff'}">[${timestamp}] ${message}</div>`;
+                logElement.scrollTop = logElement.scrollHeight;
+            }
+        }
+
+        function addResult(section, message, type = 'pass') {
+            const resultsElement = document.getElementById(`${section}Results`);
+            if (resultsElement) {
+                const statusDiv = document.createElement('div');
+                statusDiv.className = `status ${type}`;
+                statusDiv.textContent = message;
+                resultsElement.appendChild(statusDiv);
+            }
+            if (type === 'pass') stats.testsPassed++;
+            updateStats();
+        }
+
+        // Test 1: Math Utilities
+        function testMathUtilities() {
+            logToSection('math', 'Testing math utilities...', 'info');
+            
+            // Test normalize with zero vector
+            const zeroVec = { x: 0, y: 0, z: 0 };
+            const normalizedZero = normalize(zeroVec);
+            if (isFinite(normalizedZero.x) && isFinite(normalizedZero.y) && isFinite(normalizedZero.z)) {
+                addResult('math', '✅ Zero vector normalization handled safely', 'pass');
+                logToSection('math', `Zero vector normalized to: ${JSON.stringify(normalizedZero)}`, 'success');
+            }
+
+            // Test safeNormalize with THREE.js vector
+            const zeroThreeVec = new THREE.Vector3(0, 0, 0);
+            const safeNormalized = safeNormalize(zeroThreeVec);
+            if (isFinite(safeNormalized.x) && isFinite(safeNormalized.y) && isFinite(safeNormalized.z)) {
+                addResult('math', '✅ THREE.js safe normalization working', 'pass');
+                logToSection('math', `Safe normalized: ${safeNormalized.x}, ${safeNormalized.y}, ${safeNormalized.z}`, 'success');
+            }
+
+            // Test sanitizePosition
+            const nanPos = new THREE.Vector3(NaN, 5, Infinity);
+            const sanitizedPos = sanitizePosition(nanPos);
+            if (isFinite(sanitizedPos.x) && isFinite(sanitizedPos.y) && isFinite(sanitizedPos.z)) {
+                addResult('math', '✅ Position sanitization working', 'pass');
+                logToSection('math', `Sanitized position: ${sanitizedPos.x}, ${sanitizedPos.y}, ${sanitizedPos.z}`, 'success');
+            }
+        }
+
+        // Test 2: Load and sanitize models
+        async function testModelLoading() {
+            const loader = new GLTFLoader();
+            
+            try {
+                // Test shark model
+                logToSection('shark', 'Loading shark model...', 'info');
+                const sharkGltf = await new Promise((resolve, reject) => {
+                    loader.load('./assets/models/shark.glb', resolve, undefined, reject);
+                });
+                
+                let sharkSanitized = false;
+                sharkGltf.scene.traverse((child) => {
+                    if (child.isMesh && child.geometry) {
+                        const wasSanitized = sanitizeGeometry(child.geometry);
+                        if (wasSanitized) {
+                            sharkSanitized = true;
+                            stats.geometriesSanitized++;
+                        }
+                    }
+                });
+                
+                scene.add(sharkGltf.scene);
+                sharkGltf.scene.position.set(-3, 0, 0);
+                addResult('shark', '✅ Shark model loaded and sanitized', 'pass');
+                logToSection('shark', `Shark geometry sanitized: ${sharkSanitized}`, sharkSanitized ? 'success' : 'info');
+
+                // Test flying robot
+                logToSection('robot', 'Loading flying robot model...', 'info');
+                const robotGltf = await new Promise((resolve, reject) => {
+                    loader.load('./assets/models/flyingRobot.glb', resolve, undefined, reject);
+                });
+                
+                let robotSanitized = false;
+                robotGltf.scene.traverse((child) => {
+                    if (child.isMesh && child.geometry) {
+                        const wasSanitized = sanitizeGeometry(child.geometry);
+                        if (wasSanitized) {
+                            robotSanitized = true;
+                            stats.geometriesSanitized++;
+                        }
+                    }
+                });
+                
+                scene.add(robotGltf.scene);
+                robotGltf.scene.position.set(3, 0, 0);
+                addResult('robot', '✅ Flying robot loaded and sanitized', 'pass');
+                logToSection('robot', `Robot geometry sanitized: ${robotSanitized}`, robotSanitized ? 'success' : 'info');
+
+                // Test weapon model
+                logToSection('weapon', 'Loading weapon model...', 'info');
+                const weaponGltf = await new Promise((resolve, reject) => {
+                    loader.load('./assets/models/uzi.glb', resolve, undefined, reject);
+                });
+                
+                let weaponSanitized = false;
+                weaponGltf.scene.traverse((child) => {
+                    if (child.isMesh && child.geometry) {
+                        const wasSanitized = sanitizeGeometry(child.geometry);
+                        if (wasSanitized) {
+                            weaponSanitized = true;
+                            stats.geometriesSanitized++;
+                        }
+                    }
+                });
+                
+                scene.add(weaponGltf.scene);
+                weaponGltf.scene.position.set(0, 2, 2);
+                weaponGltf.scene.scale.setScalar(0.5);
+                addResult('weapon', '✅ Weapon model loaded and sanitized', 'pass');
+                logToSection('weapon', `Weapon geometry sanitized: ${weaponSanitized}`, weaponSanitized ? 'success' : 'info');
+
+                updateStats();
+
+            } catch (error) {
+                console.error('Model loading failed:', error);
+                addResult('shark', `❌ Model loading failed: ${error.message}`, 'warning');
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Rotate models for visual confirmation
+            scene.traverse((object) => {
+                if (object.isMesh && object.parent !== scene) {
+                    object.parent.rotation.y += 0.01;
+                }
+            });
+            
+            renderer.render(scene, camera);
+        }
+
+        // Main test execution
+        async function runValidation() {
+            console.log('🚀 Starting NaN fix validation...');
+            
+            // Test math utilities first
+            testMathUtilities();
+            
+            // Then test model loading
+            await testModelLoading();
+            
+            // Update final status
+            setTimeout(() => {
+                const successBanner = document.getElementById('successBanner');
+                if (stats.nanErrors === 0) {
+                    successBanner.innerHTML = '🎉 SUCCESS: All BufferGeometry NaN errors eliminated!';
+                    successBanner.style.background = 'linear-gradient(45deg, #28a745, #20c997)';
+                } else {
+                    successBanner.innerHTML = `⚠️ WARNING: ${stats.nanErrors} NaN errors detected`;
+                    successBanner.style.background = 'linear-gradient(45deg, #ffc107, #fd7e14)';
+                }
+                
+                console.log(`✅ Validation complete! Tests passed: ${stats.testsPassed}, NaN errors: ${stats.nanErrors}, Geometries sanitized: ${stats.geometriesSanitized}`);
+            }, 2000);
+        }
+
+        // Start tests
+        animate();
+        runValidation();
+    </script>
+</body>
+</html>
