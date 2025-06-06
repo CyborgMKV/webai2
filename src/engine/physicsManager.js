@@ -22,9 +22,9 @@ export default class PhysicsManager {
             
             // Use modern Rapier initialization API
             if (typeof this.RAPIER.init === 'function') {
-                await this.RAPIER.init();
+                await this.RAPIER.init({});
             } else if (typeof this.RAPIER.default?.init === 'function') {
-                await this.RAPIER.default.init();
+                await this.RAPIER.default.init({});
             }
             
             // Create physics world without gravity (space environment)
@@ -40,9 +40,9 @@ export default class PhysicsManager {
                 
                 // Use modern Rapier initialization API
                 if (typeof this.RAPIER.init === 'function') {
-                    await this.RAPIER.init();
+                    await this.RAPIER.init({});
                 } else if (typeof this.RAPIER.default?.init === 'function') {
-                    await this.RAPIER.default.init();
+                    await this.RAPIER.default.init({});
                 }
                 
                 const gravity = { x: 0.0, y: 0.0, z: 0.0 };
